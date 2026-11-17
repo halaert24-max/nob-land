@@ -1,0 +1,1250 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#08110b">
+<title>Beheer — Voetbal IQ</title>
+
+<style>
+  :root{
+    --bg-0:#08110b;
+    --bg-1:#0f2214;
+    --accent:#25d366;
+    --accent-deep:#1aa851;
+    --text:#f2fff7;
+    --muted:#93ab9c;
+    --card:rgba(15,34,20,.78);
+    --stroke:rgba(37,211,102,.16);
+    --stroke-soft:rgba(255,255,255,.07);
+    --danger:#ff6b6b;
+    --warn:#ffc857;
+    --radius:18px;
+  }
+
+  *,*::before,*::after{box-sizing:border-box;}
+
+  body{
+    margin:0;
+    min-height:100vh;
+    padding:28px 16px 48px;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    color:var(--text);
+    background:
+      radial-gradient(120% 60% at 50% -10%, #173a24 0%, rgba(8,17,11,0) 60%),
+      linear-gradient(180deg,#08110b 0%, #0f2214 60%, #08110b 100%);
+    background-attachment:fixed;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  .wrap{max-width:640px;margin:0 auto;}
+
+  /* ----------------------------- HEADER ------------------------------ */
+  .head{
+    display:flex;
+    align-items:center;
+    gap:11px;
+    margin-bottom:22px;
+  }
+
+  .mark{
+    width:38px;height:38px;flex:0 0 auto;
+    display:grid;place-items:center;
+    border-radius:12px;
+    color:#06170d;
+    background:linear-gradient(150deg,#4df08a,var(--accent) 55%,var(--accent-deep));
+    box-shadow:0 6px 20px -8px rgba(37,211,102,.9), 0 1px 0 rgba(255,255,255,.35) inset;
+  }
+
+  .head h1{
+    margin:0;
+    font-size:17px;
+    font-weight:800;
+    letter-spacing:.12em;
+    text-transform:uppercase;
+  }
+
+  .head p{
+    margin:3px 0 0;
+    font-size:12.5px;
+    color:var(--muted);
+  }
+
+  /* ------------------------------ CARD ------------------------------- */
+  .card{
+    padding:20px;
+    margin-bottom:14px;
+    border:1px solid var(--stroke);
+    border-radius:var(--radius);
+    background:linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,0) 38%), var(--card);
+    box-shadow:0 1px 0 rgba(255,255,255,.05) inset, 0 24px 50px -30px rgba(0,0,0,.9);
+  }
+
+  .card__title{
+    margin:0 0 4px;
+    font-size:14px;
+    font-weight:800;
+    letter-spacing:.02em;
+  }
+
+  .card__hint{
+    margin:0 0 16px;
+    font-size:12.5px;
+    line-height:1.55;
+    color:var(--muted);
+  }
+
+  .card__hint code, .card__hint b{color:#cfe9da;}
+
+  /* ------------------------------ FORM ------------------------------- */
+  .field{margin-bottom:16px;}
+  .field:last-child{margin-bottom:0;}
+
+  label{
+    display:block;
+    margin-bottom:7px;
+    font-size:12px;
+    font-weight:700;
+    letter-spacing:.06em;
+    text-transform:uppercase;
+    color:#b9d3c4;
+  }
+
+  input[type="text"]{
+    width:100%;
+    padding:13px 14px;
+    font-family:inherit;
+    font-size:15px;
+    color:var(--text);
+    border:1px solid rgba(255,255,255,.1);
+    border-radius:12px;
+    background:rgba(0,0,0,.28);
+    outline:none;
+    transition:border-color .15s ease, box-shadow .15s ease, background .15s ease;
+  }
+
+  input[type="text"]::placeholder{color:#5f776b;}
+
+  input[type="text"]:focus{
+    border-color:rgba(37,211,102,.55);
+    box-shadow:0 0 0 3px rgba(37,211,102,.14);
+    background:rgba(0,0,0,.36);
+  }
+
+  input[type="text"].is-error{
+    border-color:rgba(255,107,107,.7);
+    box-shadow:0 0 0 3px rgba(255,107,107,.12);
+  }
+
+  .msg{
+    margin:7px 0 0;
+    font-size:12px;
+    line-height:1.45;
+  }
+
+  .msg:empty{display:none;}
+  .msg.err{color:var(--danger);}
+  .msg.ok{color:var(--accent);}
+  .msg.warn{color:var(--warn);}
+
+  /* --------------------------- KANAALLIJST --------------------------- */
+  .channels{display:grid;gap:10px;}
+
+  .ch-row{
+    padding:12px;
+    border:1px solid var(--stroke-soft);
+    border-radius:13px;
+    background:rgba(0,0,0,.22);
+  }
+
+  .ch-row__top{
+    display:grid;
+    grid-template-columns:28px 1fr 34px;
+    gap:8px;
+    align-items:start;
+  }
+
+  .ch-row__num{
+    display:grid;
+    place-items:center;
+    width:28px;height:28px;
+    margin-top:5px;
+    font-size:11px;
+    font-weight:800;
+    color:#7e968a;
+    border-radius:8px;
+    background:rgba(255,255,255,.05);
+  }
+
+  .ch-row input[type="text"]{
+    padding:11px 12px;
+    font-size:14px;
+    border-radius:10px;
+  }
+
+  .ch-row__del{
+    display:grid;
+    place-items:center;
+    width:34px;height:34px;
+    margin-top:1px;
+    padding:0;
+    flex:0 0 auto;
+    font-size:17px;
+    line-height:1;
+    font-weight:700;
+    color:#8fa89b;
+    border:1px solid rgba(255,255,255,.1);
+    border-radius:9px;
+    background:rgba(255,255,255,.04);
+    cursor:pointer;
+    transition:color .15s ease, border-color .15s ease, background .15s ease;
+  }
+
+  .ch-row__del:hover{
+    color:#ffb3b3;
+    border-color:rgba(255,107,107,.45);
+    background:rgba(255,107,107,.1);
+  }
+
+  .ch-row__del:disabled{opacity:.3;cursor:not-allowed;}
+
+  .ch-row__meta{
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px;
+    margin-top:10px;
+  }
+
+  .chip{
+    display:inline-flex;
+    align-items:center;
+    gap:5px;
+    padding:5px 9px;
+    font-size:10.5px;
+    font-weight:700;
+    letter-spacing:.03em;
+    color:#9db3a6;
+    border:1px solid var(--stroke-soft);
+    border-radius:999px;
+    background:rgba(255,255,255,.03);
+  }
+
+  .chip.live{color:var(--accent);border-color:rgba(37,211,102,.3);background:rgba(37,211,102,.07);}
+  .chip .cdot{
+    width:6px;height:6px;border-radius:50%;
+    background:var(--accent);
+    animation:blink 1.6s infinite;
+  }
+  @keyframes blink{0%,100%{opacity:.35;}50%{opacity:1;}}
+
+  .ch-msg{
+    margin:6px 0 0;
+    font-size:11.5px;
+    line-height:1.45;
+  }
+  .ch-msg:empty{display:none;}
+  .ch-msg.err{color:var(--danger);}
+
+  .ch-add{
+    width:100%;
+    margin-top:10px;
+    min-height:44px;
+    font-size:13.5px;
+    font-weight:700;
+    color:#cfe9da;
+    border:1px dashed rgba(37,211,102,.38);
+    border-radius:12px;
+    background:rgba(37,211,102,.06);
+    cursor:pointer;
+    transition:background .15s ease;
+  }
+
+  .ch-add:hover{background:rgba(37,211,102,.12);}
+
+  /* ---------------------------- CLOAKER ----------------------------- */
+  .cloaker-box{
+    display:grid;
+    gap:8px;
+    margin-top:4px;
+  }
+
+  .cl-row{
+    display:grid;
+    grid-template-columns:52px 1fr 34px;
+    gap:8px;
+    align-items:center;
+  }
+
+  .cl-row span{
+    font-size:10px;
+    font-weight:800;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    color:#7e968a;
+  }
+
+  .cl-row code{
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    font-size:11.5px;
+    line-height:1.5;
+    color:#cfe9da;
+    word-break:break-all;
+  }
+
+  .copy{
+    display:grid;
+    place-items:center;
+    width:34px;height:34px;
+    padding:0;
+    font-size:14px;
+    color:#8fa89b;
+    border:1px solid rgba(255,255,255,.1);
+    border-radius:9px;
+    background:rgba(255,255,255,.04);
+    cursor:pointer;
+    transition:color .15s ease, background .15s ease;
+  }
+
+  .copy:hover{color:var(--accent);background:rgba(37,211,102,.1);}
+  .copy.done{color:var(--accent);border-color:rgba(37,211,102,.5);}
+
+  /* ----------------------------- STATS ------------------------------ */
+  .filters{
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px;
+    margin-bottom:14px;
+  }
+
+  .filters button{
+    padding:8px 14px;
+    min-height:0;
+    font-size:12px;
+    font-weight:700;
+    color:#9db3a6;
+    border:1px solid rgba(255,255,255,.1);
+    border-radius:999px;
+    background:rgba(255,255,255,.04);
+    cursor:pointer;
+    transition:color .15s ease, background .15s ease, border-color .15s ease;
+  }
+
+  .filters button:hover{background:rgba(255,255,255,.08);}
+
+  .filters button.active{
+    color:#04150b;
+    background:var(--accent);
+    border-color:var(--accent);
+  }
+
+  .statgrid{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:8px;
+    margin-bottom:14px;
+  }
+
+  .statbox{
+    padding:12px 10px;
+    text-align:center;
+    border:1px solid var(--stroke-soft);
+    border-radius:12px;
+    background:rgba(0,0,0,.22);
+  }
+
+  .statbox strong{
+    display:block;
+    font-size:20px;
+    font-weight:800;
+    letter-spacing:-.02em;
+    color:#e9fff1;
+  }
+
+  .statbox span{
+    display:block;
+    margin-top:3px;
+    font-size:9.5px;
+    font-weight:700;
+    letter-spacing:.07em;
+    text-transform:uppercase;
+    color:#7e968a;
+  }
+
+  .statbox.cr strong{color:var(--accent);}
+
+  table{
+    width:100%;
+    border-collapse:collapse;
+    font-size:12px;
+  }
+
+  th,td{
+    padding:8px 6px;
+    text-align:left;
+    border-bottom:1px solid var(--stroke-soft);
+  }
+
+  th{
+    font-size:9.5px;
+    font-weight:800;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    color:#7e968a;
+  }
+
+  td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;}
+
+  td .mini{
+    display:inline-block;
+    padding:2px 7px;
+    font-size:10px;
+    font-weight:700;
+    border-radius:999px;
+    background:rgba(255,255,255,.05);
+    color:#9db3a6;
+  }
+
+  .empty{
+    padding:18px 10px;
+    text-align:center;
+    font-size:12.5px;
+    color:#6d857a;
+  }
+
+  /* ---------------------------- BUTTONS ----------------------------- */
+  .actions{
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
+    margin-top:18px;
+  }
+
+  button.primary{
+    flex:1 1 auto;
+    min-height:48px;
+    padding:13px 18px;
+    border:0;
+    border-radius:12px;
+    font-family:inherit;
+    font-size:14.5px;
+    font-weight:800;
+    letter-spacing:-.01em;
+    cursor:pointer;
+    color:#04150b;
+    background:linear-gradient(180deg,#38e37a,var(--accent) 50%,#1fbe5c);
+    box-shadow:0 1px 0 rgba(255,255,255,.4) inset, 0 12px 28px -14px rgba(37,211,102,.9);
+    transition:transform .15s ease, filter .15s ease;
+    -webkit-tap-highlight-color:transparent;
+  }
+
+  button.primary:hover{filter:brightness(1.05);}
+  button.primary:active{transform:scale(.985);}
+  button.primary:disabled{opacity:.45;cursor:not-allowed;transform:none;}
+
+  button.ghost{
+    flex:1 1 auto;
+    min-height:48px;
+    padding:13px 18px;
+    border:1px solid rgba(255,255,255,.12);
+    border-radius:12px;
+    font-family:inherit;
+    font-size:14.5px;
+    font-weight:800;
+    color:var(--text);
+    background:rgba(255,255,255,.06);
+    cursor:pointer;
+    transition:background .15s ease;
+  }
+
+  button.ghost:hover{background:rgba(255,255,255,.1);}
+  button.ghost:disabled{opacity:.45;cursor:not-allowed;}
+
+  /* ----------------------------- STATUS ----------------------------- */
+  .status{
+    display:none;
+    margin-top:14px;
+    padding:12px 14px;
+    border-radius:11px;
+    font-size:13px;
+    line-height:1.55;
+    border:1px solid transparent;
+  }
+
+  .status.show{display:block;}
+
+  .status.info{
+    color:#cfe9da;
+    background:rgba(37,211,102,.08);
+    border-color:rgba(37,211,102,.22);
+  }
+
+  .status.bad{
+    color:#ffc9c9;
+    background:rgba(255,107,107,.08);
+    border-color:rgba(255,107,107,.24);
+  }
+
+  .status b{color:#fff;}
+
+  /* ----------------------------- FOOTER ----------------------------- */
+  .foot{
+    margin:0;
+    text-align:center;
+    font-size:11px;
+    line-height:1.7;
+    color:rgba(147,171,156,.62);
+  }
+
+  .foot a{color:var(--accent);text-decoration:none;font-weight:700;}
+  .foot a:hover{text-decoration:underline;}
+
+  .filebox{
+    display:none;
+    margin-top:12px;
+    padding:14px;
+    border:1px dashed rgba(37,211,102,.35);
+    border-radius:12px;
+    background:rgba(37,211,102,.05);
+  }
+
+  .filebox.show{display:block;}
+
+  .filebox input[type="file"]{
+    width:100%;
+    font-size:12.5px;
+    color:var(--muted);
+  }
+
+  .dots{display:inline-flex;gap:3px;}
+  .dots i{
+    width:5px;height:5px;border-radius:50%;background:var(--accent);
+    animation:blink 1.2s infinite;
+  }
+  .dots i:nth-child(2){animation-delay:.2s;}
+  .dots i:nth-child(3){animation-delay:.4s;}
+  @keyframes blink{0%,80%,100%{opacity:.2;}40%{opacity:1;}}
+
+  @media (max-width:460px){
+    .statgrid{grid-template-columns:repeat(3,1fr);gap:6px;}
+    .statbox strong{font-size:17px;}
+    .cl-row{grid-template-columns:44px 1fr 34px;}
+  }
+
+  @media (prefers-reduced-motion:reduce){
+    *,*::before,*::after{animation:none !important;transition:none !important;}
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <header class="head">
+    <span class="mark" aria-hidden="true">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/>
+        <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2v.2a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.6 1.7 1.7 0 0 0-1.9.4l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0-1.2-2.9H2a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.6-1.1 1.7 1.7 0 0 0-.4-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H8a1.7 1.7 0 0 0 1-1.5V2a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V8a1.7 1.7 0 0 0 1.5 1H22a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/>
+      </svg>
+    </span>
+    <div>
+      <h1>Instellingen</h1>
+      <p id="status-line">Index laden<span class="dots"><i></i><i></i><i></i></span></p>
+    </div>
+  </header>
+
+  <!-- ---------------------------- FORM ---------------------------- -->
+  <section class="card">
+    <h2 class="card__title">Pixel, cloaker &amp; kanalen</h2>
+    <p class="card__hint">
+      Vul je Meta Pixel ID, de cloaker-link die je in je advertenties gebruikt en
+      één of meer Telegram-kanalen in. Wijzigingen worden rechtstreeks in
+      <code>index.html</code> geschreven.
+    </p>
+
+    <div class="field">
+      <label for="pixel">Meta Pixel ID</label>
+      <input id="pixel" type="text" inputmode="numeric" autocomplete="off"
+             spellcheck="false" placeholder="bijv. 1234567890123456">
+      <p class="msg" id="pixel-msg"></p>
+    </div>
+
+    <div class="field">
+      <label for="cloaker">Cloaker-link (advertentie-URL)</label>
+      <input id="cloaker" type="text" autocomplete="off"
+             spellcheck="false" placeholder="https:// jouw-cloaker.nl/path">
+      <p class="msg" id="cloaker-msg"></p>
+    </div>
+
+    <div class="field">
+      <label>Telegram-kanalen / -groepen</label>
+
+      <div class="channels" id="channels"></div>
+
+      <button id="btn-add" class="ch-add" type="button">+ Nog een kanaal toevoegen</button>
+      <p class="msg" id="channel-msg"></p>
+    </div>
+  </section>
+
+  <!-- --------------------------- STATS ---------------------------- -->
+  <section class="card">
+    <h2 class="card__title">Statistieken</h2>
+    <p class="card__hint">
+      Bezoekers die op de landingspagina aankomen en hoe vaak er op de
+      Telegram-knop wordt geklikt, per kanaal.
+    </p>
+
+    <div class="filters" id="filters">
+      <button type="button" data-days="1">Vandaag</button>
+      <button type="button" data-days="7">7 dagen</button>
+      <button type="button" data-days="30" class="active">30 dagen</button>
+      <button type="button" data-days="90">90 dagen</button>
+    </div>
+
+    <div class="statgrid">
+      <div class="statbox"><strong id="s-visits">–</strong><span>Bezoekers</span></div>
+      <div class="statbox"><strong id="s-clicks">–</strong><span>Kliks</span></div>
+      <div class="statbox cr"><strong id="s-cr">–</strong><span>CTR</span></div>
+    </div>
+
+    <div id="stat-table"></div>
+  </section>
+
+  <!-- --------------------------- ACTIONS --------------------------- -->
+  <section class="card">
+    <h2 class="card__title">Opslaan</h2>
+    <p class="card__hint" id="save-hint">
+      Controleer de waarden en sla op. Daarna upload je <code>index.html</code> naar je server.
+    </p>
+
+    <div class="actions">
+      <button id="btn-save" class="primary" type="button" disabled>Opslaan in index.html</button>
+      <button id="btn-download" class="ghost" type="button" disabled>Download index.html</button>
+    </div>
+
+    <div class="status" id="status" role="status" aria-live="polite"></div>
+
+    <div class="filebox" id="filebox">
+      <label for="file-input" style="margin-bottom:8px;">Selecteer handmatig index.html</label>
+      <input id="file-input" type="file" accept=".html,text/html">
+    </div>
+  </section>
+
+  <p class="foot">
+    <a href="index.html" target="_blank" rel="noopener">Open landingspagina &rarr;</a><br>
+    Deze pagina heeft <code>noindex</code>. Verwijder of hernoem hem na gebruik.
+  </p>
+
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ------------------------------------------------------------------ *
+   *  DOM
+   * ------------------------------------------------------------------ */
+  var $pixel      = document.getElementById('pixel');
+  var $cloaker    = document.getElementById('cloaker');
+  var $pixelMsg   = document.getElementById('pixel-msg');
+  var $cloakerMsg = document.getElementById('cloaker-msg');
+  var $channels   = document.getElementById('channels');
+  var $channelMsg = document.getElementById('channel-msg');
+  var $btnAdd     = document.getElementById('btn-add');
+  var $filters    = document.getElementById('filters');
+  var $sVisits    = document.getElementById('s-visits');
+  var $sClicks    = document.getElementById('s-clicks');
+  var $sCr        = document.getElementById('s-cr');
+  var $statTable  = document.getElementById('stat-table');
+  var $status     = document.getElementById('status');
+  var $statusLine = document.getElementById('status-line');
+  var $btnSave     = document.getElementById('btn-save');
+  var $btnDownload = document.getElementById('btn-download');
+  var $filebox     = document.getElementById('filebox');
+  var $fileInput   = document.getElementById('file-input');
+
+  var state = {
+    html: null,       // inhoud van index.html
+    fileName: 'index.html',
+    rows: [],         // [{ id, link, addedAt }]
+    cloaker: '',
+    statsDays: 30
+  };
+
+  var rowSeq = 0;
+
+  /* ------------------------------------------------------------------ *
+   *  1. Kanaal normaliseren (gelijk aan index.html)
+   * ------------------------------------------------------------------ */
+  function normalizeChannel(input) {
+    var raw = String(input || '').trim();
+    if (!raw) { return { kind: 'empty', value: '', web: '', deep: '' }; }
+
+    var s = raw
+      .replace(/^tg:\/\/resolve\?domain=/i, '')
+      .replace(/^tg:\/\/join\?invite=/i, '')
+      .replace(/^https?:\/\//i, '')
+      .replace(/^(t|telegram)\.me\//i, '');
+
+    s = s.replace(/^@/, '').replace(/^joinchat\//i, '+');
+    s = s.replace(/[?#].*$/, '').replace(/\/+$/, '');
+
+    if (!s) { return { kind: 'empty', value: '', web: '', deep: '' }; }
+
+    if (s.charAt(0) === '+') {
+      var hash = s.slice(1);
+      return {
+        kind: 'invite',
+        value: '+' + hash,
+        web: 'https://t.me/+' + hash,
+        deep: 'tg://join?invite=' + hash
+      };
+    }
+
+    return {
+      kind: 'public',
+      value: s,
+      web: 'https://t.me/' + s,
+      deep: 'tg://resolve?domain=' + s
+    };
+  }
+
+  function validRow(link) {
+    var n = normalizeChannel(link);
+    if (n.kind === 'empty') {
+      return { ok: false, text: 'Vul een kanaalnaam of invite-link in.', n: n };
+    }
+    if (n.kind === 'invite' && n.value.length < 8) {
+      return { ok: false, text: 'De invite-link lijkt onvolledig.', n: n };
+    }
+    if (n.kind === 'public' && !/^[A-Za-z0-9_]{3,64}$/.test(n.value)) {
+      return { ok: false, text: 'Alleen letters, cijfers en _ (min. 3 tekens).', n: n };
+    }
+    return { ok: true, text: '', n: n };
+  }
+
+  function validatePixel(id) {
+    var v = String(id || '').trim();
+    if (!v) {
+      return { ok: false, level: 'err', text: 'Vul je Pixel ID in (te vinden in Meta Events Manager).' };
+    }
+    if (!/^\d+$/.test(v)) {
+      return { ok: false, level: 'err', text: 'Een Pixel ID bestaat alleen uit cijfers.' };
+    }
+    if (v.length < 15 || v.length > 16) {
+      return { ok: true, level: 'warn',
+               text: 'Let op: een Pixel ID heeft meestal 15 of 16 cijfers (nu ' + v.length + ').' };
+    }
+    return { ok: true, level: 'ok', text: 'Ziet er goed uit.' };
+  }
+
+  function validateCloaker(url) {
+    var v = String(url || '').trim();
+    if (!v) {
+      return { ok: true, level: 'ok', text: 'Geen cloaker ingesteld — advertenties gaan direct naar deze pagina.' };
+    }
+    if (!/^https?:\/\/[^\s]+\.[^\s]+/i.test(v)) {
+      return { ok: false, level: 'err', text: 'Vul een geldige URL in (met https://).' };
+    }
+    return { ok: true, level: 'ok', text: 'Cloaker-link opgeslagen.' };
+  }
+
+  /* ------------------------------------------------------------------ *
+   *  2. Kanaalrijen
+   * ------------------------------------------------------------------ */
+  function addRow(link, addedAt) {
+    var row = { id: ++rowSeq, link: link || '', addedAt: addedAt || 0 };
+    state.rows.push(row);
+    renderRows();
+    return row;
+  }
+
+  function removeRow(id) {
+    state.rows = state.rows.filter(function (r) { return r.id !== id; });
+    if (!state.rows.length) { addRow('', 0); return; }
+    renderRows();
+  }
+
+  function renderRows() {
+    $channels.textContent = '';
+
+    state.rows.forEach(function (row, i) {
+      var bad = row.link.trim() !== '' && !validRow(row.link).ok;
+      var norm = normalizeChannel(row.link);
+
+      var wrap = document.createElement('div');
+      wrap.className = 'ch-row';
+
+      var top = document.createElement('div');
+      top.className = 'ch-row__top';
+
+      var num = document.createElement('span');
+      num.className = 'ch-row__num';
+      num.textContent = String(i + 1);
+
+      var input = document.createElement('input');
+      input.type = 'text';
+      input.autocomplete = 'off';
+      input.spellcheck = false;
+      input.placeholder = '@mijnkanaal of https://t.me/+AbCdEf123';
+      input.value = row.link;
+      input.setAttribute('aria-label', 'Kanaal ' + (i + 1));
+      if (bad) { input.classList.add('is-error'); }
+      input.addEventListener('input', function () {
+        row.link = input.value;
+        var b = row.link.trim() !== '' && !validRow(row.link).ok;
+        input.classList.toggle('is-error', b);
+        updateRowMeta(row, wrap);
+        refreshMsgs();
+        refreshButtons();
+      });
+
+      var del = document.createElement('button');
+      del.type = 'button';
+      del.className = 'ch-row__del';
+      del.innerHTML = '&times;';
+      del.title = 'Kanaal verwijderen';
+      del.setAttribute('aria-label', 'Kanaal ' + (i + 1) + ' verwijderen');
+      del.disabled = state.rows.length === 1;
+      del.addEventListener('click', function () { removeRow(row.id); });
+
+      top.appendChild(num);
+      top.appendChild(input);
+      top.appendChild(del);
+      wrap.appendChild(top);
+
+      var meta = document.createElement('div');
+      meta.className = 'ch-row__meta';
+      wrap.appendChild(meta);
+
+      $channels.appendChild(wrap);
+      updateRowMeta(row, wrap);
+    });
+
+    refreshMsgs();
+    refreshButtons();
+  }
+
+  /* Chip onder elk kanaalveld: actief-sinds + kopieerbare trackinglink */
+  function updateRowMeta(row, wrap) {
+    var meta = wrap.querySelector('.ch-row__meta');
+    meta.textContent = '';
+
+    var norm = normalizeChannel(row.link);
+    if (norm.kind === 'empty') { return; }
+
+    // "actief sinds" chip
+    if (row.addedAt > 0) {
+      var days = Math.floor((Date.now() - row.addedAt) / 86400000);
+      var chip = document.createElement('span');
+      chip.className = 'chip live';
+      chip.innerHTML = '<i class="cdot"></i>';
+      chip.appendChild(document.createTextNode(
+        'Actief sinds ' + new Date(row.addedAt).toLocaleDateString('nl-NL') +
+        ' (' + days + ' d)'
+      ));
+      meta.appendChild(chip);
+    }
+
+    // trackinglink ?t=<index>
+    var idx = state.rows.indexOf(row);
+    if (idx > -1) {
+      var baseUrl = getCloakerBase();
+      var trackUrl = baseUrl + (baseUrl.indexOf('?') > -1 ? '&' : '?') + 't=' + idx;
+
+      var linkChip = document.createElement('span');
+      linkChip.className = 'chip';
+      linkChip.textContent = 't=' + idx + ' · ' + trackUrl;
+
+      var copyBtn = document.createElement('button');
+      copyBtn.type = 'button';
+      copyBtn.className = 'copy';
+      copyBtn.innerHTML = '&#128203;'; // klembord
+      copyBtn.title = 'Kopieer trackinglink';
+      copyBtn.setAttribute('aria-label', 'Kopieer trackinglink voor kanaal ' + (idx + 1));
+      copyBtn.addEventListener('click', function () {
+        copyText(trackUrl, copyBtn);
+      });
+
+      meta.appendChild(linkChip);
+      meta.appendChild(copyBtn);
+    }
+  }
+
+  function getCloakerBase() {
+    var c = $cloaker.value.trim() || window.location.origin + window.location.pathname;
+    return c.replace(/\/+$/, '');
+  }
+
+  function copyText(text, btn) {
+    function done() {
+      btn.classList.add('done');
+      btn.innerHTML = '&#10003;';
+      setTimeout(function () {
+        btn.classList.remove('done');
+        btn.innerHTML = '&#128203;';
+      }, 1400);
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, function () { fallbackCopy(text, done); });
+    } else {
+      fallbackCopy(text, done);
+    }
+  }
+
+  function fallbackCopy(text, done) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); } catch (e) { /* noop */ }
+    document.body.removeChild(ta);
+    done();
+  }
+
+  /* ------------------------------------------------------------------ *
+   *  3. Meldingen
+   * ------------------------------------------------------------------ */
+  function setMsg(el, text, cls) {
+    el.textContent = text || '';
+    el.className = cls || 'msg';
+  }
+
+  function refreshMsgs() {
+    var filled = state.rows.filter(function (r) { return r.link.trim() !== ''; });
+    var broken = filled.filter(function (r) { return !validRow(r.link).ok; });
+    var valid  = filled.filter(function (r) { return validRow(r.link).ok; });
+
+    if (!filled.length) {
+      setMsg($channelMsg, 'Vul minimaal één kanaal in.', 'msg err');
+      return;
+    }
+    if (broken.length) {
+      setMsg($channelMsg, broken.length + ' kanaal(en) zijn ongeldig.', 'msg err');
+      return;
+    }
+    var invite = valid.filter(function (r) { return normalizeChannel(r.link).kind === 'invite'; }).length;
+    setMsg($channelMsg,
+      valid.length + ' kanaal(en) actief' +
+      (invite ? ' (' + invite + ' invite-link' + (invite > 1 ? 's' : '') + ')' : '') + '.',
+      'msg ok');
+  }
+
+  function refreshButtons() {
+    var pv = validatePixel($pixel.value);
+    var cv = validateCloaker($cloaker.value);
+    var okC = state.rows.some(function (r) { return r.link.trim() && validRow(r.link).ok; }) &&
+              state.rows.every(function (r) { return !r.link.trim() || validRow(r.link).ok; });
+
+    $btnSave.disabled     = !(pv.ok && cv.ok && okC && !!state.html);
+    $btnDownload.disabled = !(pv.ok && cv.ok && okC);
+  }
+
+  function refresh() {
+    var pv = validatePixel($pixel.value);
+    setMsg($pixelMsg, pv.text, 'msg ' + pv.level);
+
+    var cv = validateCloaker($cloaker.value);
+    setMsg($cloakerMsg, cv.text, 'msg ' + cv.level);
+
+    refreshMsgs();
+    refreshButtons();
+    renderRows(); // hercalculeert de trackinglinks (cloaker kan gewijzigd zijn)
+  }
+
+  /* ------------------------------------------------------------------ *
+   *  4. index.html lezen
+   * ------------------------------------------------------------------ */
+  function readConfig(html) {
+    var m = html.match(/\/\* <<<CONFIG_START>>> \*\/([\s\S]*?)\/\* <<<CONFIG_END>>> \*\//);
+    if (!m) { return null; }
+
+    var body  = m[1];
+    var pixel = body.match(/pixelId\s*:\s*["']([^"']*)["']/);
+    var cloak = body.match(/cloaker\s*:\s*["']([^"']*)["']/);
+    var list  = [];
+
+    var arr = body.match(/channels\s*:\s*\[([\s\S]*?)\]\s*\n?\s*\}/);
+    if (arr) {
+      var re = /link\s*:\s*["']([^"']*)["']\s*(?:,\s*addedAt\s*:\s*([\d.]+))?/g;
+      var hit;
+      while ((hit = re.exec(arr[1]))) {
+        list.push({ link: hit[1], addedAt: parseFloat(hit[2]) || 0 });
+      }
+    }
+    if (!list.length) {
+      var old = body.match(/channel\s*:\s*["']([^"']*)["']/);
+      if (old) { list.push({ link: old[1], addedAt: 0 }); }
+    }
+
+    return {
+      pixelId: pixel ? pixel[1] : '',
+      cloaker: cloak ? cloak[1] : '',
+      channels: list
+    };
+  }
+
+  function placeholderCheck(link) {
+    return link === 'YOUR_CHANNEL' || link === '' ? '' : link;
+  }
+
+  function acceptHtml(html, sourceName) {
+    if (!/<<<CONFIG_START>>>/.test(html)) {
+      showStatus('bad', 'Dit bestand bevat geen instellingenblok. Gebruik de originele index.html.');
+      return;
+    }
+    state.html = html;
+    if (sourceName) { state.fileName = sourceName; }
+
+    var cfg = readConfig(html) || { pixelId: '', cloaker: '', channels: [] };
+    $pixel.value   = cfg.pixelId === 'YOUR_PIXEL_ID' ? '' : cfg.pixelId;
+    $cloaker.value = cfg.cloaker || '';
+
+    state.rows = [];
+    (cfg.channels.length ? cfg.channels : [{ link: '', addedAt: 0 }]).forEach(function (c) {
+      state.rows.push({ id: ++rowSeq, link: placeholderCheck(c.link), addedAt: c.addedAt || 0 });
+    });
+    renderRows();
+
+    $statusLine.textContent = 'index.html geladen — pas de waarden aan';
+    $filebox.classList.remove('show');
+    refresh();
+  }
+
+  function loadIndex() {
+    fetch('index.html?ts=' + Date.now(), { cache: 'no-store' })
+      .then(function (r) {
+        if (!r.ok) { throw new Error('HTTP ' + r.status); }
+        return r.text();
+      })
+      .then(function (html) { acceptHtml(html); })
+      .catch(function () {
+        $statusLine.textContent = 'Kon index.html niet automatisch laden';
+        $filebox.classList.add('show');
+      });
+  }
+
+  /* ------------------------------------------------------------------ *
+   *  5. Nieuwe index.html genereren
+   * ------------------------------------------------------------------ */
+  function buildOutput() {
+    var pixelId = $pixel.value.trim();
+    var cloaker = $cloaker.value.trim();
+    var now = Date.now();
+
+    var entries = state.rows
+      .filter(function (r) { return r.link.trim() && validRow(r.link).ok; })
+      .map(function (r) {
+        var norm = normalizeChannel(r.link);
+        // bestaande kanalen behouden hun oorspronkelijke addedAt
+        var added = r.addedAt || now;
+        return '    { link: ' + JSON.stringify(norm.value) +
+               ', addedAt: ' + Math.floor(added) + ' }';
+      });
+
+    var block =
+      '/* <<<CONFIG_START>>> */\n' +
+      'window.SITE_CONFIG = {\n' +
+      '  pixelId: ' + JSON.stringify(pixelId) + ',\n' +
+      '  cloaker: ' + JSON.stringify(cloaker) + ',\n' +
+      '  channels: [\n' + entries.join(',\n') + '\n  ]\n' +
+      '};\n' +
+      '/* <<<CONFIG_END>>> */';
+
+    var out = state.html.replace(
+      /\/\* <<<CONFIG_START>>> \*\/[\s\S]*?\/\* <<<CONFIG_END>>> \*\//,
+      block
+    );
+
+    out = out.replace(
+      /facebook\.com\/tr\?id=[^&"'\s]+&ev=PageView&noscript=1/g,
+      'facebook.com/tr?id=' + encodeURIComponent(pixelId) + '&ev=PageView&noscript=1'
+    );
+
+    var first = state.rows.filter(function (r) { return r.link.trim() && validRow(r.link).ok; })[0];
+    if (first) {
+      out = out.replace(
+        /(<a id="cta-noscript" href=")[^"]*(")/,
+        '$1' + normalizeChannel(first.link).web.replace(/\$/g, '$$$$') + '$2'
+      );
+    }
+
+    return out;
+  }
+
+  /* ------------------------------------------------------------------ *
+   *  6. Opslaan
+   * ------------------------------------------------------------------ */
+  function showStatus(kind, html) {
+    $status.className = 'status show ' + kind;
+    $status.innerHTML = html;
+  }
+
+  function saveDirect() {
+    if (!window.showSaveFilePicker) { download(); return; }
+
+    var content = buildOutput();
+
+    window.showSaveFilePicker({
+      suggestedName: state.fileName,
+      types: [{ description: 'HTML', accept: { 'text/html': ['.html'] } }]
+    }).then(function (handle) {
+      return handle.createWritable().then(function (w) {
+        return w.write(content).then(function () { return w.close(); });
+      });
+    }).then(function () {
+      showStatus('info',
+        '<b>Opgeslagen.</b> Upload <code>' + state.fileName + '</code> nu naar je server ' +
+        '(overschrijf het oude bestand).');
+    }).catch(function (err) {
+      if (err && err.name === 'AbortError') { return; }
+      showStatus('bad', 'Opslaan mislukt: ' + (err && err.message ? err.message : 'onbekende fout') +
+                         '. Gebruik anders "Download index.html".');
+    });
+  }
+
+  function download() {
+    var content = buildOutput();
+    var blob = new Blob([content], { type: 'text/html;charset=utf-8' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = state.fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1500);
+
+    showStatus('info',
+      '<b>Gedownload.</b> Vervang <code>' + state.fileName + '</code> op je server door dit bestand.');
+  }
+
+  /* ------------------------------------------------------------------ *
+   *  7. Statistieken
+   * ------------------------------------------------------------------ */
+  function esc(s) {
+    return String(s).replace(/[&<>"]/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+    });
+  }
+
+  function loadStats() {
+    fetch('/api/stats?days=' + state.statsDays, { cache: 'no-store' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (data) { renderStats(data); })
+      .catch(function () { renderStats(null); });
+  }
+
+  function renderStats(data) {
+    if (!data) {
+      $sVisits.textContent = '–';
+      $sClicks.textContent = '–';
+      $sCr.textContent = '–';
+      $statTable.innerHTML = '<div class="empty">Statistieken niet beschikbaar — ' +
+        'draai de site via <code>node server.js</code> (of een host die de API aanbiedt).</div>';
+      return;
+    }
+
+    var visits = data.total.visits || 0;
+    var clicks = data.total.clicks || 0;
+    var cr = visits > 0 ? (clicks / visits * 100) : 0;
+
+    $sVisits.textContent = visits.toLocaleString('nl-NL');
+    $sClicks.textContent = clicks.toLocaleString('nl-NL');
+    $sCr.textContent = cr.toFixed(1) + '%';
+
+    var dayKeys = Object.keys(data.days).sort().reverse();
+
+    if (!dayKeys.length) {
+      $statTable.innerHTML = '<div class="empty">Nog geen bezoekers geregistreerd in deze periode.</div>';
+      return;
+    }
+
+    var html = '<table><thead><tr>' +
+      '<th>Datum</th><th class="num">Bezoekers</th><th class="num">Kliks</th><th class="num">CTR</th>' +
+      '</tr></thead><tbody>';
+
+    dayKeys.forEach(function (key) {
+      var day = data.days[key];
+      var dv = 0, dc = 0;
+      Object.keys(day).forEach(function (idx) {
+        dv += day[idx].visits || 0;
+        dc += day[idx].clicks || 0;
+      });
+      var dcr = dv > 0 ? (dc / dv * 100) : 0;
+
+      html += '<tr><td>' + key + '</td>' +
+        '<td class="num">' + dv.toLocaleString('nl-NL') + '</td>' +
+        '<td class="num">' + dc.toLocaleString('nl-NL') + '</td>' +
+        '<td class="num"><span class="mini">' + dcr.toFixed(1) + '%</span></td></tr>';
+    });
+
+    html += '</tbody></table>';
+    $statTable.innerHTML = html;
+  }
+
+  $filters.addEventListener('click', function (e) {
+    var btn = e.target.closest('button[data-days]');
+    if (!btn) { return; }
+    Array.prototype.forEach.call($filters.children, function (b) { b.classList.remove('active'); });
+    btn.classList.add('active');
+    state.statsDays = parseInt(btn.getAttribute('data-days'), 10) || 30;
+    loadStats();
+  });
+
+  /* ------------------------------------------------------------------ *
+   *  8. Events
+   * ------------------------------------------------------------------ */
+  $pixel.addEventListener('input', function () {
+    var pv = validatePixel($pixel.value);
+    setMsg($pixelMsg, pv.text, 'msg ' + pv.level);
+    $pixel.classList.toggle('is-error', !pv.ok && $pixel.value.trim() !== '');
+    refreshButtons();
+  });
+
+  $cloaker.addEventListener('input', function () {
+    var cv = validateCloaker($cloaker.value);
+    setMsg($cloakerMsg, cv.text, 'msg ' + cv.level);
+    $cloaker.classList.toggle('is-error', !cv.ok && $cloaker.value.trim() !== '');
+    updateAllRowMeta();
+    refreshButtons();
+  });
+
+  function updateAllRowMeta() {
+    Array.prototype.forEach.call($channels.children, function (wrap, i) {
+      if (state.rows[i]) { updateRowMeta(state.rows[i], wrap); }
+    });
+  }
+
+  $btnAdd.addEventListener('click', function () {
+    addRow('', 0);
+    var inputs = $channels.querySelectorAll('input[type="text"]');
+    if (inputs.length) { inputs[inputs.length - 1].focus(); }
+  });
+
+  $btnSave.addEventListener('click', saveDirect);
+  $btnDownload.addEventListener('click', download);
+
+  $fileInput.addEventListener('change', function () {
+    var f = $fileInput.files && $fileInput.files[0];
+    if (!f) { return; }
+    var reader = new FileReader();
+    reader.onload = function () {
+      acceptHtml(String(reader.result), f.name || 'index.html');
+      showStatus('info', '<b>' + (f.name || 'Bestand') + '</b> geladen.');
+    };
+    reader.onerror = function () { showStatus('bad', 'Kon het bestand niet lezen.'); };
+    reader.readAsText(f, 'utf-8');
+  });
+
+  loadIndex();
+  loadStats();
+  setInterval(loadStats, 30000); // elke 30 s verversen
+})();
+</script>
+
+</body>
+</html>
