@@ -511,11 +511,13 @@ s.parentNode.insertBefore(t,s)}(window,document,'script',
     var search = window.location.search || '';
     if (search.charAt(0) === '?') { search = search.slice(1); }
 
-    // 't' is een interne parameter en hoort niet in de Telegram-link
+    // 't' en 'land' zijn interne parameters en horen niet in de Telegram-link
     var parts = search ? search.split('&') : [];
     var keep = [];
     for (var i = 0; i < parts.length; i++) {
-      if (parts[i] && parts[i].indexOf('t=') !== 0) { keep.push(parts[i]); }
+      if (parts[i] && parts[i].indexOf('t=') !== 0 && parts[i].indexOf('land=') !== 0) {
+        keep.push(parts[i]);
+      }
     }
     return keep.join('&');
   }
