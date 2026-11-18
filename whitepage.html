@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Voetbal IQ — Nieuws &amp; Analyses</title>
+<meta name="description" content="Dagelijkse voetbalnieuws, wedstrijdanalyses en achtergronden.">
+<style>
+  :root{
+    --bg:#0d1117; --card:#161d27; --text:#e6edf3; --muted:#8b949e;
+    --accent:#3fb950; --stroke:rgba(240,246,252,.1);
+  }
+  *,*::before,*::after{box-sizing:border-box;}
+  body{
+    margin:0; min-height:100vh; padding:28px 16px 48px;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+    color:var(--text);
+    background:linear-gradient(180deg,#0d1117 0%,#10161f 60%,#0d1117 100%);
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:680px;margin:0 auto;}
+  .head{display:flex;align-items:center;gap:10px;margin-bottom:26px;}
+  .mark{
+    width:36px;height:36px;border-radius:10px;flex:0 0 auto;
+    display:grid;place-items:center;color:#04150b;
+    background:linear-gradient(150deg,#57d999,var(--accent));
+  }
+  .head h1{margin:0;font-size:17px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;}
+  .head p{margin:2px 0 0;font-size:12px;color:var(--muted);}
+  .article{
+    background:var(--card);border:1px solid var(--stroke);border-radius:14px;
+    padding:18px 18px 16px;margin-bottom:14px;
+  }
+  .article .tag{
+    display:inline-block;font-size:10px;font-weight:700;letter-spacing:.08em;
+    text-transform:uppercase;color:var(--accent);margin-bottom:8px;
+  }
+  .article h2{margin:0 0 6px;font-size:15.5px;font-weight:700;line-height:1.4;}
+  .article p{margin:0;font-size:13px;line-height:1.6;color:var(--muted);}
+  .article .meta{margin-top:10px;font-size:11px;color:#6e7681;}
+  .foot{
+    margin-top:26px;text-align:center;font-size:11px;color:#6e7681;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="head">
+    <span class="mark" aria-hidden="true">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 19V10M10 19V5M16 19v-6M22 19H2"/>
+      </svg>
+    </span>
+    <div>
+      <h1>Voetbal IQ</h1>
+      <p>Nieuws &amp; wedstrijdanalyses</p>
+    </div>
+  </header>
+
+  <article class="article">
+    <span class="tag">Analyse</span>
+    <h2>Tactische analyse: hoe de middenmoters dit seizoen verrassen</h2>
+    <p>Een groeiende groep clubs hanteert een compacte 3-4-2-1 met snelle omschakeling.
+       We zetten de cijfers op een rij en kijken wat dat betekent voor de speelwijze
+       van komende speelronde.</p>
+    <div class="meta">Redactie &middot; vandaag</div>
+  </article>
+
+  <article class="article">
+    <span class="tag">Nieuws</span>
+    <h2>Overzicht: alle uitslagen en standen van afgelopen speelronde</h2>
+    <p>Europees voetbal blijft verrassen. Een compleet overzicht van de uitslagen,
+       de bijgewerkte standen en de opvallendste prestaties van het weekend.</p>
+    <div class="meta">Redactie &middot; gisteren</div>
+  </article>
+
+  <article class="article">
+    <span class="tag">Achtergrond</span>
+    <h2>Data &amp; voetbal: wat xG ons (niet) vertelt</h2>
+    <p>Verwachte doelpunten zijn inmiddels hét discussiepunt onder analisten. We leggen
+       simpel uit hoe de statistiek werkt en waar de grenzen liggen.</p>
+    <div class="meta">Redactie &middot; deze week</div>
+  </article>
+
+  <p class="foot">&copy; 2026 Voetbal IQ &middot; Onafhankelijke voetbalanalysepagina</p>
+</div>
+</body>
+</html>
