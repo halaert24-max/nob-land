@@ -7,6 +7,7 @@
  *   - POST /api/config  -> slaat op EN past index.html direct aan (live)
  *   - POST /api/stats   -> registreert bezoek/klik per kanaal-index
  *   - GET  /api/stats   -> JSON-overzicht (door admin.html gebruikt)
+ *   - GET  /api/visits  -> detaillog: IP's, bots, cloaker-blokkades
  *   - GET  /api/health  -> statuscontrole
  *
  * Data wordt opgeslagen in $DATA_DIR (default: deze map):
@@ -713,7 +714,10 @@ function loadStats() {
   }
 }
 
-function saveStats() {
+let saveTimer = null;
+
+function saveStatsNow() {
+  if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
   try {
     fs.writeFileSync(STATS_FILE, JSON.stringify(stats, null, 2), 'utf-8');
   } catch (e) {
@@ -721,26 +725,75 @@ function saveStats() {
   }
 }
 
+/* Het log groeit; schrijf niet bij elk verzoek de hele file weg.
+   Uiterlijk 1,5 s na de laatste wijziging staat alles op schijf. */
+function saveStats() {
+  if (saveTimer) { return; }
+  saveTimer = setTimeout(function () {
+    saveTimer = null;
+    try {
+      fs.writeFileSync(STATS_FILE, JSON.stringify(stats, null, 2), 'utf-8');
+    } catch (e) {
+      console.error('[stats] kon niet opslaan:', e.message);
+    }
+  }, 1500);
+  if (saveTimer.unref) { saveTimer.unref(); }
+}
+
+process.on('exit', saveStatsNow);
+process.on('SIGINT', function () { saveStatsNow(); process.exit(0); });
+process.on('SIGTERM', function () { saveStatsNow(); process.exit(0); });
+
 function dayKey(d) {
   return d.toISOString().slice(0, 10); // YYYY-MM-DD (UTC)
 }
 
-function record(type, channelIdx) {
+/* ?t=<index> uit de URL (voor server-side registratie bij de cloaker). */
+function channelIdxFromUrl(req) {
+  try {
+    const t = parseInt((new URL(req.url, 'http://localhost')).searchParams.get('t'), 10);
+    return (isFinite(t) && t >= 0 && t <= 500) ? t : 0;
+  } catch (e) {
+    return 0;
+  }
+}
+
+const LOG_LIMIT = 5000; // max. detailregels in stats.json
+
+function record(type, channelIdx, meta) {
   const key = dayKey(new Date());
   if (!stats.days[key]) { stats.days[key] = {}; }
 
   const day = stats.days[key];
   const idx = String(channelIdx);
 
-  if (!day[idx]) { day[idx] = { visits: 0, clicks: 0 }; }
+  if (!day[idx]) { day[idx] = { visits: 0, clicks: 0, blocked: 0 }; }
+  if (!isFinite(day[idx].blocked)) { day[idx].blocked = 0; }
   if (type === 'visit') { day[idx].visits += 1; }
   else if (type === 'click') { day[idx].clicks += 1; }
+  else if (type === 'blocked') { day[idx].blocked += 1; }
+
+  /* Detaillog voor de admin: laatste LOG_LIMIT bezoekers. */
+  if (!Array.isArray(stats.log)) { stats.log = []; }
+  stats.log.push({
+    ts: Date.now(),
+    type: type,
+    t: channelIdx,
+    ip: (meta && meta.ip) || '',
+    ua: String((meta && meta.ua) || '').slice(0, 300),
+    ref: String((meta && meta.ref) || '').slice(0, 300),
+    bot: !!(meta && meta.bot),
+    nl: !!(meta && meta.nl)
+  });
+  if (stats.log.length > LOG_LIMIT) {
+    stats.log = stats.log.slice(-LOG_LIMIT);
+  }
 
   saveStats();
 }
 
 function summarize(daysBack) {
-  const out = { days: {}, total: { visits: 0, clicks: 0 } };
+  const out = { days: {}, total: { visits: 0, clicks: 0, blocked: 0 } };
   const cutoff = new Date(Date.now() - daysBack * 86400000);
 
   Object.keys(stats.days).sort().forEach(function (key) {
@@ -749,10 +802,99 @@ function summarize(daysBack) {
     Object.keys(stats.days[key]).forEach(function (idx) {
       out.total.visits += stats.days[key][idx].visits || 0;
       out.total.clicks += stats.days[key][idx].clicks || 0;
+      out.total.blocked += stats.days[key][idx].blocked || 0;
     });
   });
 
   return out;
+}
+
+/* Detailoverzicht voor de admin: logregels + per-kanaal totalen binnen
+   de periode. daysBack = 0 betekent "alles uit het log laten zien".
+   De grens valt op het begin van een UTC-dag, zodat "Vandaag" en
+   "7 dagen" evenveel dagen tonen als in de dagtabel. */
+function visitReport(daysBack) {
+  let cutoff = 0;
+  if (daysBack > 0) {
+    const d = new Date();
+    d.setUTCHours(0, 0, 0, 0);
+    cutoff = d.getTime() - (daysBack - 1) * 86400000;
+  }
+  const log = (Array.isArray(stats.log) ? stats.log : [])
+    .filter(function (e) { return !cutoff || e.ts >= cutoff; })
+    .slice(-LOG_LIMIT);
+
+  const byChannel = {};   // idx -> { visits, clicks, blocked }
+  const chIpSeen = {};    // idx -> { ip: { visit, click, blocked } }
+  const byIp = {};        // ip -> { visits, clicks, blocked, last, ua, t }
+  const ipSeen = {};      // ip -> Set van kanalen (uniek tellen)
+  let totalVisits = 0, totalClicks = 0, totalBlocked = 0;
+
+  log.forEach(function (e) {
+    const idx = String(e.t || 0);
+    if (!byChannel[idx]) { byChannel[idx] = { visits: 0, clicks: 0, blocked: 0 }; }
+    if (!chIpSeen[idx]) { chIpSeen[idx] = {}; }
+    if (e.type === 'visit') { byChannel[idx].visits += 1; totalVisits += 1; }
+    else if (e.type === 'click') { byChannel[idx].clicks += 1; totalClicks += 1; }
+    else if (e.type === 'blocked') { byChannel[idx].blocked += 1; totalBlocked += 1; }
+
+    if (e.ip) {
+      if (!byIp[e.ip]) {
+        byIp[e.ip] = { ip: e.ip, visits: 0, clicks: 0, blocked: 0,
+                       last: 0, ua: '', t: e.t, bot: e.bot, nl: e.nl };
+        ipSeen[e.ip] = {};
+      }
+      const rec = byIp[e.ip];
+      if (e.type === 'visit') { rec.visits += 1; }
+      else if (e.type === 'click') { rec.clicks += 1; }
+      else if (e.type === 'blocked') { rec.blocked += 1; }
+      if (e.ts >= rec.last) {
+        rec.last = e.ts;
+        rec.ua = e.ua || rec.ua;
+        rec.t = e.t;
+        rec.bot = e.bot;
+        rec.nl = e.nl;
+      }
+      if (e.type === 'visit') { ipSeen[e.ip][idx] = 1; }
+
+      /* Unieke personen per kanaal: een IP telt per soort één keer. */
+      if (!chIpSeen[idx][e.ip]) {
+        chIpSeen[idx][e.ip] = { visit: 0, click: 0, blocked: 0 };
+      }
+      chIpSeen[idx][e.ip][e.type] = 1;
+    }
+  });
+
+  /* uniq-velden per kanaal toevoegen */
+  Object.keys(byChannel).forEach(function (idx) {
+    const seen = chIpSeen[idx] || {};
+    let uv = 0, uc = 0, ub = 0;
+    Object.keys(seen).forEach(function (ip) {
+      if (seen[ip].visit) { uv += 1; }
+      if (seen[ip].click) { uc += 1; }
+      if (seen[ip].blocked) { ub += 1; }
+    });
+    byChannel[idx].uniqVisitors = uv;
+    byChannel[idx].uniqClicks = uc;
+    byChannel[idx].uniqBlocked = ub;
+  });
+
+  const visitors = Object.keys(byIp).map(function (ip) {
+    const rec = byIp[ip];
+    rec.channels = Object.keys(ipSeen[ip]).length;
+    return rec;
+  }).sort(function (a, b) { return b.last - a.last; });
+
+  return {
+    total: { visits: totalVisits, clicks: totalClicks, blocked: totalBlocked },
+    channels: byChannel,
+    visitors: visitors,
+    log: log,
+    /* Vanaf wanneer het detaillog loopt (oudere dagen staan alleen in de
+       dagtotalen) en hoeveel regels er nu zijn. */
+    since: (Array.isArray(stats.log) && stats.log.length) ? stats.log[0].ts : 0,
+    logSize: (Array.isArray(stats.log) ? stats.log.length : 0)
+  };
 }
 
 /* ================================================================== *
@@ -888,7 +1030,13 @@ function handleApi(req, res) {
         let idx = parseInt(params.get('t'), 10);
         if (!isFinite(idx) || idx < 0 || idx > 500) { idx = 0; }
 
-        record(type, idx);
+        record(type, idx, {
+          ip: clientIp(req),
+          ua: params.get('ua') || req.headers['user-agent'] || '',
+          ref: params.get('ref') || '',
+          bot: isBot(req),
+          nl: isNL(clientIp(req))
+        });
         res.writeHead(204);
         res.end();
       });
@@ -903,6 +1051,23 @@ function handleApi(req, res) {
     let back = parseInt(url.searchParams.get('days'), 10);
     if (!isFinite(back) || back < 1 || back > 365) { back = 30; }
     sendJson(res, 200, summarize(back));
+    return;
+  }
+
+  /* ---- visits (detaillog voor de admin) ---- */
+  if (url.pathname === '/api/visits') {
+    if (req.method !== 'GET') {
+      sendJson(res, 405, { error: 'method not allowed' });
+      return;
+    }
+    if (!isAdmin(req)) {
+      sendJson(res, 401, { error: 'unauthorized' });
+      return;
+    }
+
+    let back = parseInt(url.searchParams.get('days'), 10);
+    if (!isFinite(back) || back < 0 || back > 365) { back = 30; } // 0 = alles
+    sendJson(res, 200, visitReport(back));
     return;
   }
 
@@ -945,6 +1110,18 @@ function serveStatic(req, res) {
        niet-NL-bezoekers krijgen whitepage.html, met dezelfde response-
        status zodat de uitkomst er hetzelfde uitziet. */
     if (isIndex && ext === '.html' && wantsWhitepage(req)) {
+      /* Geregistreerd als 'blocked' zodat de admin ziet hoeveel bezoekers
+         de cloaker tegenhield (per kanaal via ?t= in de link). */
+      try {
+        record('blocked', channelIdxFromUrl(req), {
+          ip: clientIp(req),
+          ua: req.headers['user-agent'] || '',
+          ref: req.headers.referer || '',
+          bot: isBot(req),
+          nl: isNL(clientIp(req))
+        });
+      } catch (e) { /* statistiek mag het verkeer nooit blokkeren */ }
+
       fs.readFile(WHITEPAGE_FILE, function (err2, white) {
         if (err2) {
           // geen whitepage aanwezig -> normaal gedrag

@@ -214,12 +214,16 @@
     flex-wrap:wrap;
     gap:6px;
     margin-top:10px;
+    min-width:0;
   }
 
   .chip{
     display:inline-flex;
     align-items:center;
     gap:5px;
+    max-width:100%;
+    min-width:0;
+    overflow:hidden;
     padding:5px 9px;
     font-size:10.5px;
     font-weight:700;
@@ -229,6 +233,8 @@
     border-radius:999px;
     background:rgba(255,255,255,.03);
     text-decoration:none;
+    text-overflow:ellipsis;
+    white-space:nowrap;
   }
 
   a.chip:hover{color:var(--text);border-color:rgba(37,211,102,.35);}
@@ -348,6 +354,51 @@
     margin-bottom:14px;
   }
 
+  .statgrid.cols4{grid-template-columns:repeat(4,1fr);}
+
+  .statbox.cr strong{color:var(--accent);}
+  .statbox.bl strong{color:var(--warn);}
+
+  .sub{
+    margin:16px 0 8px;
+    font-size:11px;
+    font-weight:800;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    color:#7e968a;
+  }
+  .sub:first-of-type{margin-top:0;}
+
+  .vfilter{
+    display:flex;
+    gap:8px;
+    align-items:center;
+    margin-bottom:12px;
+  }
+  .vfilter input[type="text"]{
+    flex:1 1 auto;
+    padding:10px 12px;
+    font-size:13px;
+    border-radius:10px;
+  }
+
+  .tag{
+    display:inline-block;
+    padding:2px 7px;
+    font-size:10px;
+    font-weight:700;
+    border-radius:999px;
+    background:rgba(255,255,255,.05);
+    color:#9db3a6;
+    margin-right:3px;
+  }
+  .tag.bot{background:rgba(255,200,87,.12);color:var(--warn);}
+  .tag.nl{background:rgba(37,211,102,.1);color:var(--accent);}
+  .tag.out{background:rgba(37,211,102,.16);color:var(--accent);}
+  .tag.blk{background:rgba(255,107,107,.12);color:var(--danger);}
+
+  td .ip{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11.5px;}
+
   .statbox{
     padding:12px 10px;
     text-align:center;
@@ -381,6 +432,12 @@
     border-collapse:collapse;
     font-size:12px;
   }
+
+  .tscroll{
+    overflow-x:auto;
+    -webkit-overflow-scrolling:touch;
+  }
+  .tscroll table{min-width:430px;}
 
   th,td{
     padding:8px 6px;
@@ -676,6 +733,50 @@
     <div id="stat-table"></div>
   </section>
 
+  <!-- ----------------------- BEZOEKERS & VERKEER ------------------- -->
+  <section class="card">
+    <h2 class="card__title">Bezoekers &amp; verkeer</h2>
+    <p class="card__hint">
+      Recent bezoekers met IP-adres. Wie door de cloaker de whitepage krijgt
+      (bot of geen NL-IP) staat erbij als <b>geblokkeerd</b> en telt mee.
+    </p>
+
+    <div class="filters" id="vfilters">
+      <button type="button" data-days="1">Vandaag</button>
+      <button type="button" data-days="7">7 dagen</button>
+      <button type="button" data-days="30" class="active">30 dagen</button>
+      <button type="button" data-days="90">90 dagen</button>
+      <button type="button" data-days="0">Alles</button>
+    </div>
+
+    <div class="statgrid cols4">
+      <div class="statbox"><strong id="v-visits">–</strong><span>Bezoekers</span></div>
+      <div class="statbox"><strong id="v-clicks">–</strong><span>Kliks</span></div>
+      <div class="statbox bl"><strong id="v-blocked">–</strong><span>Geblokkeerd</span></div>
+      <div class="statbox"><strong id="v-uniq">–</strong><span>Uniek IP</span></div>
+    </div>
+
+    <p class="sub">Per kanaal (trackinglink)</p>
+    <div id="vchannel-table" class="tscroll"></div>
+
+    <p class="sub">Bezoekers</p>
+    <div class="filters" id="vtype">
+      <button type="button" data-type="all" class="active">Alles</button>
+      <button type="button" data-type="click">Kliks</button>
+      <button type="button" data-type="blocked">Geblokkeerd</button>
+      <button type="button" data-type="bot">Bots</button>
+      <button type="button" data-type="human">Echte bezoekers</button>
+    </div>
+    <div class="vfilter">
+      <input id="vsearch" type="text" autocomplete="off" spellcheck="false"
+             placeholder="Filter op IP, user-agent of kanaal…">
+    </div>
+    <div class="tscroll">
+      <div id="visitor-table"></div>
+    </div>
+    <p class="msg" id="v-note" style="margin-top:10px;color:#6d857a;"></p>
+  </section>
+
   <!-- --------------------------- ACTIONS --------------------------- -->
   <section class="card">
     <h2 class="card__title">Opslaan</h2>
@@ -722,6 +823,16 @@
   var $sClicks    = document.getElementById('s-clicks');
   var $sCr        = document.getElementById('s-cr');
   var $statTable  = document.getElementById('stat-table');
+  var $vVisits    = document.getElementById('v-visits');
+  var $vClicks    = document.getElementById('v-clicks');
+  var $vBlocked   = document.getElementById('v-blocked');
+  var $vUniq      = document.getElementById('v-uniq');
+  var $vChanTable = document.getElementById('vchannel-table');
+  var $visitorTable = document.getElementById('visitor-table');
+  var $vSearch    = document.getElementById('vsearch');
+  var $vfilters   = document.getElementById('vfilters');
+  var $vtype      = document.getElementById('vtype');
+  var $vNote      = document.getElementById('v-note');
   var $status     = document.getElementById('status');
   var $statusLine = document.getElementById('status-line');
   var $btnSave     = document.getElementById('btn-save');
@@ -735,6 +846,9 @@
     rows: [],         // [{ id, link, addedAt }]
     cloaker: '',
     statsDays: 30,
+    visitDays: 30,
+    visitType: 'all',
+    visitData: null,
     token: ''         // beheerderswachtwoord (server: ADMIN_TOKEN)
   };
 
@@ -791,6 +905,7 @@
         showApp();
         loadIndex();
         loadStats();
+        loadVisits();
       } else {
         $loginErr.classList.add('show');
         $loginPass.focus();
@@ -813,6 +928,7 @@
           showApp();
           loadIndex();
           loadStats();
+          loadVisits();
         } else {
           try { sessionStorage.removeItem('nob_admin_tok'); } catch (e) { /* noop */ }
           $veil.classList.remove('hidden');
@@ -948,7 +1064,7 @@
         row.link = input.value;
         var b = row.link.trim() !== '' && !validRow(row.link).ok;
         input.classList.toggle('is-error', b);
-        updateRowMeta(row, wrap);
+        updateAllRowMeta();   // indices van álle trackinglinks kunnen verschuiven
         refreshMsgs();
         refreshButtons();
       });
@@ -979,6 +1095,19 @@
     refreshButtons();
   }
 
+  /* Volgorde waarin de server de kanalen opslaat: alleen gevulde én
+     geldige rijen tellen mee. De ?t=<index> van de trackinglink moet
+     daarmee overeenkomen, anders belandt het verkeer bij kanaal 0. */
+  function savedRows() {
+    return state.rows.filter(function (r) {
+      return r.link.trim() !== '' && validRow(r.link).ok;
+    });
+  }
+
+  function savedIndex(row) {
+    return savedRows().indexOf(row);
+  }
+
   /* Chip onder elk kanaalveld: actief-sinds + kopieerbare trackinglink */
   function updateRowMeta(row, wrap) {
     var meta = wrap.querySelector('.ch-row__meta');
@@ -1001,7 +1130,7 @@
     }
 
     // trackinglink ?t=<index>
-    var idx = state.rows.indexOf(row);
+    var idx = savedIndex(row);
     if (idx > -1) {
       var baseUrl = getCloakerBase();
       var trackUrl = baseUrl + (baseUrl.indexOf('?') > -1 ? '&' : '?') + 't=' + idx;
@@ -1178,6 +1307,10 @@
     $statusLine.textContent = sourceLabel || 'index.html geladen — pas de waarden aan';
     $filebox.classList.remove('show');
     refresh();
+
+    /* Kanaalnamen zijn nu bekend: bezoekerstabel opnieuw tekenen zodat
+       de kolom "Kanaal" niet op t=<index> blijft staan. */
+    if (state.visitData) { renderVisitorRows(); }
   }
 
   function loadIndex() {
@@ -1438,6 +1571,204 @@
   });
 
   /* ------------------------------------------------------------------ *
+   *  7b. Bezoekers & verkeer (detaillog via /api/visits)
+   * ------------------------------------------------------------------ */
+  function channelLabel(idx) {
+    var i = parseInt(idx, 10);
+    var saved = savedRows();
+    if (saved[i]) {
+      var n = normalizeChannel(saved[i].link);
+      return '@' + n.value.replace(/^\+/, '');
+    }
+    return 't=' + idx;
+  }
+
+  function uaShort(ua) {
+    var s = String(ua || '');
+    if (!s) { return '—'; }
+    if (/facebookexternalhit|meta-external/i.test(s)) { return 'Facebook/Meta bot'; }
+    if (/adsbot-google|googleadsbot|mediapartners/i.test(s)) { return 'Google Ads bot'; }
+    if (/googlebot|google-inspectiontool/i.test(s)) { return 'Google bot'; }
+    if (/headlesschrome|puppeteer|playwright|phantomjs/i.test(s)) { return 'Headless browser'; }
+    if (/curl|wget|python|java\/|okhttp|go-http-client|scrapy|libwww/i.test(s)) { return 'Script/bot'; }
+    if (/iPhone|iPod/i.test(s)) { return 'iPhone'; }
+    if (/iPad/i.test(s)) { return 'iPad'; }
+    if (/Android/i.test(s)) { return 'Android'; }
+    if (/Windows/i.test(s)) { return 'Windows'; }
+    if (/Macintosh/i.test(s)) { return 'Mac'; }
+    return s.split(/\s+/)[0].slice(0, 24);
+  }
+
+  function fmtTime(ts) {
+    try {
+      return new Date(ts).toLocaleString('nl-NL', {
+        day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'
+      });
+    } catch (e) { return String(ts); }
+  }
+
+  function loadVisits() {
+    authedFetch('/api/visits?days=' + state.visitDays, { cache: 'no-store' })
+      .then(function (r) {
+        if (r.status === 401) { throw new Error('unauthorized'); }
+        return r.ok ? r.json() : null;
+      })
+      .then(function (data) {
+        state.visitData = data;
+        renderVisitors();
+      })
+      .catch(function () {
+        state.visitData = null;
+        renderVisitors();
+      });
+  }
+
+  function renderVisitors() {
+    var data = state.visitData;
+
+    if (!data) {
+      $vVisits.textContent = '–';
+      $vClicks.textContent = '–';
+      $vBlocked.textContent = '–';
+      $vUniq.textContent = '–';
+      $vChanTable.innerHTML = '<div class="empty">Niet beschikbaar — draai de site via <code>node server.js</code>.</div>';
+      $visitorTable.innerHTML = '';
+      $vNote.textContent = '';
+      return;
+    }
+
+    /* Detaillog is nieuw: oudere dagen zitten alleen in de dagtotalen. */
+    if (data.since) {
+      $vNote.textContent = 'Detaillog loopt sinds ' + fmtTime(data.since) +
+        ' (max. ' + (data.logSize || 0) + ' regels). Oudere dagen staan alleen in de dagtabel hierboven.';
+    } else {
+      $vNote.textContent = 'Nog geen detaillog — de eerste bezoekers verschijnen hier zodra ze binnenkomen.';
+    }
+
+    var t = data.total || {};
+    $vVisits.textContent = (t.visits || 0).toLocaleString('nl-NL');
+    $vClicks.textContent = (t.clicks || 0).toLocaleString('nl-NL');
+    $vBlocked.textContent = (t.blocked || 0).toLocaleString('nl-NL');
+    $vUniq.textContent = (data.visitors || []).length.toLocaleString('nl-NL');
+
+    /* ---- per kanaal ---- */
+    var chanKeys = Object.keys(data.channels || {}).sort(function (a, b) {
+      return parseInt(a, 10) - parseInt(b, 10);
+    });
+
+    if (!chanKeys.length) {
+      $vChanTable.innerHTML = '<div class="empty">Nog geen verkeer geregistreerd in deze periode.</div>';
+    } else {
+      var html = '<table><thead><tr>' +
+        '<th>Trackinglink</th><th class="num">Bezoekers</th><th class="num">Kliks</th>' +
+        '<th class="num">Unieke kliks</th><th class="num">Geblokkeerd</th><th class="num">CTR</th>' +
+        '</tr></thead><tbody>';
+      var tv = 0, tc = 0, tb = 0, tuv = 0, tuc = 0;
+
+      chanKeys.forEach(function (key) {
+        var c = data.channels[key];
+        var cv = c.visits || 0, cc = c.clicks || 0, cb = c.blocked || 0;
+        var ucv = c.uniqClicks || 0;
+        tv += cv; tc += cc; tb += cb; tuc += ucv;
+        var cr = cv > 0 ? (cc / cv * 100) : 0;
+        html += '<tr><td><span class="mini">' + esc(channelLabel(key)) + '</span></td>' +
+          '<td class="num">' + cv.toLocaleString('nl-NL') + '</td>' +
+          '<td class="num">' + cc.toLocaleString('nl-NL') + '</td>' +
+          '<td class="num"><b>' + ucv.toLocaleString('nl-NL') + '</b></td>' +
+          '<td class="num">' + (cb ? cb.toLocaleString('nl-NL') : '—') + '</td>' +
+          '<td class="num"><span class="mini">' + cr.toFixed(1) + '%</span></td></tr>';
+      });
+
+      var tcr = tv > 0 ? (tc / tv * 100) : 0;
+      html += '<tr><td><b>Totaal</b></td>' +
+        '<td class="num"><b>' + tv.toLocaleString('nl-NL') + '</b></td>' +
+        '<td class="num"><b>' + tc.toLocaleString('nl-NL') + '</b></td>' +
+        '<td class="num"><b>' + tuc.toLocaleString('nl-NL') + '</b></td>' +
+        '<td class="num"><b>' + (tb ? tb.toLocaleString('nl-NL') : '—') + '</b></td>' +
+        '<td class="num"><span class="mini">' + tcr.toFixed(1) + '%</span></td></tr>';
+      html += '</tbody></table>';
+      $vChanTable.innerHTML = html;
+    }
+
+    renderVisitorRows();
+  }
+
+  function renderVisitorRows() {
+    var data = state.visitData;
+    if (!data) { return; }
+
+    var q = ($vSearch.value || '').trim().toLowerCase();
+    var type = state.visitType || 'all';
+    var rows = (data.visitors || []).filter(function (v) {
+      if (type === 'click' && !(v.clicks > 0)) { return false; }
+      if (type === 'blocked' && !(v.blocked > 0)) { return false; }
+      if (type === 'bot' && !v.bot) { return false; }
+      if (type === 'human' && v.bot) { return false; }
+      if (!q) { return true; }
+      var hay = [v.ip, v.ua, channelLabel(v.t)].join(' ').toLowerCase();
+      return hay.indexOf(q) > -1;
+    });
+
+    if (!rows.length) {
+      $visitorTable.innerHTML = '<div class="empty">' +
+        (q ? 'Geen bezoekers matchen dit filter.' :
+         'Nog geen bezoekers geregistreerd in deze periode.') + '</div>';
+      return;
+    }
+
+    var html = '<table><thead><tr>' +
+      '<th>IP</th><th>Info</th><th>Kanaal</th>' +
+      '<th class="num">Bezoek</th><th class="num">Klik</th><th class="num">Geblok.</th>' +
+      '<th>Laatst</th>' +
+      '</tr></thead><tbody>';
+
+    rows.slice(0, 200).forEach(function (v) {
+      var tags = '<span class="tag' + (v.bot ? ' bot' : (v.nl ? ' nl' : ' out')) + '">' +
+        (v.bot ? 'bot' : (v.nl ? 'NL' : 'buiten NL')) + '</span>';
+      if (v.blocked > 0) { tags += '<span class="tag blk">geblokkeerd</span>'; }
+      if (v.clicks > 0) { tags += '<span class="tag out">klik</span>'; }
+
+      html += '<tr>' +
+        '<td class="ip">' + esc(v.ip || '—') + '</td>' +
+        '<td>' + tags + '<div style="font-size:10.5px;color:#7e968a;margin-top:3px;">' +
+          esc(uaShort(v.ua)) + '</div></td>' +
+        '<td><span class="mini">' + esc(channelLabel(v.t)) + '</span></td>' +
+        '<td class="num">' + v.visits.toLocaleString('nl-NL') + '</td>' +
+        '<td class="num">' + (v.clicks || '—') + '</td>' +
+        '<td class="num">' + (v.blocked || '—') + '</td>' +
+        '<td style="font-size:11px;color:#9db3a6;white-space:nowrap;">' + esc(fmtTime(v.last)) + '</td>' +
+        '</tr>';
+    });
+
+    html += '</tbody></table>';
+    if (rows.length > 200) {
+      html += '<div class="empty">Eerste 200 van ' + rows.length + ' IP-adressen getoond — verfijn met het filter.</div>';
+    }
+    $visitorTable.innerHTML = html;
+  }
+
+  $vfilters.addEventListener('click', function (e) {
+    var btn = e.target.closest('button[data-days]');
+    if (!btn) { return; }
+    Array.prototype.forEach.call($vfilters.children, function (b) { b.classList.remove('active'); });
+    btn.classList.add('active');
+    state.visitDays = parseInt(btn.getAttribute('data-days'), 10);
+    if (!isFinite(state.visitDays)) { state.visitDays = 30; }
+    loadVisits();
+  });
+
+  $vSearch.addEventListener('input', function () { renderVisitorRows(); });
+
+  $vtype.addEventListener('click', function (e) {
+    var btn = e.target.closest('button[data-type]');
+    if (!btn) { return; }
+    Array.prototype.forEach.call($vtype.children, function (b) { b.classList.remove('active'); });
+    btn.classList.add('active');
+    state.visitType = btn.getAttribute('data-type') || 'all';
+    renderVisitorRows();
+  });
+
+  /* ------------------------------------------------------------------ *
    *  8. Events
    * ------------------------------------------------------------------ */
   $pixel.addEventListener('input', function () {
@@ -1478,6 +1809,7 @@
   setInterval(function () {
     if (state.token && !$veil.classList.contains('hidden')) { return; }
     loadStats();
+    loadVisits();
   }, 30000); // elke 30 s verversen (alleen als ingelogd)
 })();
 </script>

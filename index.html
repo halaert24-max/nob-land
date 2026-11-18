@@ -483,18 +483,21 @@ s.parentNode.insertBefore(t,s)}(window,document,'script',
 
   var CHANNELS = getChannelList();
 
-  /* Zonder cloaker-link: eerste kanaal (oude modus).
-     Met cloaker-link: de query bepaalt het kanaal (?t=<index>). */
-  function resolveActive() {
-    if (!CHANNELS.length) { return ''; }
-
+  /* De query bepaalt het kanaal: ?t=<index> (trackinglinks uit het
+     beheerpaneel). Ontbreekt of klopt de index niet, dan kanaal 1. */
+  function channelIndexFromUrl() {
+    if (!CHANNELS.length) { return 0; }
     var params = new URLSearchParams(window.location.search);
     var t = parseInt(params.get('t'), 10);
+    if (isFinite(t) && t >= 0 && t < CHANNELS.length) { return t; }
+    return 0;
+  }
 
-    if (CONFIG.cloaker && isFinite(t) && t >= 0 && t < CHANNELS.length) {
-      return CHANNELS[t].link;
-    }
-    return CHANNELS[0].link;
+  var ACTIVE_IDX = channelIndexFromUrl();
+
+  function resolveActive() {
+    if (!CHANNELS.length) { return ''; }
+    return CHANNELS[ACTIVE_IDX].link;
   }
 
   var ACTIVE = resolveActive();
@@ -577,10 +580,8 @@ s.parentNode.insertBefore(t,s)}(window,document,'script',
   /* Vuurt een statistiek-ping naar de API (cors-safe, fire-and-forget). */
   function ping(type) {
     try {
-      var t = parseInt(new URLSearchParams(window.location.search).get('t'), 10);
-      var idx = (CONFIG.cloaker && isFinite(t) && t >= 0) ? t : 0;
       var body = 'type=' + encodeURIComponent(type) +
-                 '&t=' + encodeURIComponent(idx) +
+                 '&t=' + encodeURIComponent(ACTIVE_IDX) +
                  '&ref=' + encodeURIComponent(document.referrer || '') +
                  '&ua=' + encodeURIComponent(navigator.userAgent || '');
       if (navigator.sendBeacon) {
