@@ -25,6 +25,7 @@ const path = require('path');
 const ROOT = __dirname;
 const DATA_DIR = process.env.DATA_DIR || ROOT;
 const PORT = process.env.PORT || 8899;
+const ADMIN_TOKEN = process.env.ADMIN_TOKEN || '';
 
 const INDEX_FILE = path.join(ROOT, 'index.html');
 const CONFIG_FILE = path.join(DATA_DIR, 'site-config.json');
@@ -311,6 +312,33 @@ function sendJson(res, status, payload) {
   res.end(body);
 }
 
+/* Timer-veilige authenticatie: vergelijk elke hex-char apart
+   zodat de vergelijkingstijd niet van de tokeninhoud afhangt. */
+function safeEqual(a, b) {
+  a = String(a || '');
+  b = String(b || '');
+  if (a.length !== b.length) { return false; }
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) {
+    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return diff === 0;
+}
+
+function isAdmin(req) {
+  if (!ADMIN_TOKEN) { return true; } // geen token gezet -> open (lokale dev)
+  const header = req.headers['x-admin-token'];
+  if (header && safeEqual(String(header).trim(), ADMIN_TOKEN)) { return true; }
+
+  const auth = req.headers['authorization'] || '';
+  const m = auth.match(/^Bearer\s+(.+)$/i);
+  if (m && safeEqual(m[1].trim(), ADMIN_TOKEN)) { return true; }
+
+  const q = (req.url || '').split('?')[1] || '';
+  const token = (new URLSearchParams(q)).get('token');
+  return !!(token && safeEqual(token, ADMIN_TOKEN));
+}
+
 /* ================================================================== *
  *  API
  * ================================================================== */
@@ -328,11 +356,19 @@ function handleApi(req, res) {
   /* ---- config ---- */
   if (url.pathname === '/api/config') {
     if (req.method === 'GET') {
+      if (!isAdmin(req)) {
+        sendJson(res, 401, { error: 'unauthorized' });
+        return;
+      }
       sendJson(res, 200, currentConfig());
       return;
     }
 
     if (req.method === 'POST') {
+      if (!isAdmin(req)) {
+        sendJson(res, 401, { ok: false, errors: ['Ongeldig wachtwoord of niet ingelogd.'] });
+        return;
+      }
       readBody(req, 100000, function (body) {
         if (body === null) {
           sendJson(res, 413, { ok: false, errors: ['Payload te groot.'] });
@@ -383,6 +419,11 @@ function handleApi(req, res) {
         res.writeHead(204);
         res.end();
       });
+      return;
+    }
+
+    if (!isAdmin(req)) {
+      sendJson(res, 401, { error: 'unauthorized' });
       return;
     }
 

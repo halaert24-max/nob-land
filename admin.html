@@ -534,9 +534,79 @@
   @media (prefers-reduced-motion:reduce){
     *,*::before,*::after{animation:none !important;transition:none !important;}
   }
+
+  /* ----------------------------- LOGIN ------------------------------- */
+  .login-veil{
+    position:fixed;inset:0;z-index:50;
+    display:grid;place-items:center;
+    padding:20px;
+    background:
+      radial-gradient(120% 60% at 50% -10%, #173a24 0%, rgba(8,17,11,0) 60%),
+      linear-gradient(180deg,#08110b 0%, #0f2214 60%, #08110b 100%);
+  }
+  .login-veil.hidden{display:none;}
+  .login-card{
+    width:100%;max-width:360px;
+    padding:26px 22px;
+    border-radius:var(--radius);
+    border:1px solid var(--stroke);
+    background:var(--card);
+    backdrop-filter:blur(14px);
+    box-shadow:0 24px 60px -30px rgba(0,0,0,.85);
+  }
+  .login-card h2{
+    margin:0 0 4px;
+    font-size:18px;font-weight:800;letter-spacing:.02em;
+    color:var(--text);
+  }
+  .login-card p{
+    margin:0 0 16px;
+    font-size:12.5px;color:var(--muted);line-height:1.5;
+  }
+  .login-card input{
+    width:100%;
+    padding:11px 13px;
+    font-size:15px;
+    color:var(--text);
+    background:rgba(8,17,11,.55);
+    border:1px solid var(--stroke-soft);
+    border-radius:12px;
+    outline:none;
+    transition:border-color .15s;
+  }
+  .login-card input:focus{border-color:var(--accent);}
+  .login-err{
+    margin:8px 0 0;
+    font-size:12px;color:var(--danger);
+    display:none;
+  }
+  .login-err.show{display:block;}
+  .login-card .btn-login{
+    width:100%;
+    margin-top:14px;
+    padding:11px 14px;
+    font-size:14px;font-weight:700;
+    color:#06170d;
+    background:linear-gradient(150deg,#4df08a,var(--accent) 55%,var(--accent-deep));
+    border:0;border-radius:12px;
+    cursor:pointer;
+  }
+  .login-card .btn-login:disabled{opacity:.55;cursor:default;}
 </style>
 </head>
 <body>
+
+<!-- ---------------------------- LOGIN ------------------------------ -->
+<div class="login-veil" id="login-veil">
+  <form class="login-card" id="login-form">
+    <h2>Beheer</h2>
+    <p>Vul het beheerderswachtwoord in om de instellingen te openen.</p>
+    <input id="login-pass" type="password" autocomplete="current-password"
+           placeholder="Wachtwoord" aria-label="Wachtwoord">
+    <p class="login-err" id="login-err">Onjuist wachtwoord. Probeer het opnieuw.</p>
+    <button class="btn-login" id="btn-login" type="submit">Inloggen</button>
+  </form>
+</div>
 
 <div class="wrap">
 
@@ -671,10 +741,96 @@
     fileName: 'index.html',
     rows: [],         // [{ id, link, addedAt }]
     cloaker: '',
-    statsDays: 30
+    statsDays: 30,
+    token: ''         // beheerderswachtwoord (server: ADMIN_TOKEN)
   };
 
   var rowSeq = 0;
+
+  /* ------------------------------------------------------------------ *
+   *  0. Login  —  wachtwoordcheck tegen de server (ADMIN_TOKEN)
+   * ------------------------------------------------------------------ */
+  var $veil     = document.getElementById('login-veil');
+  var $loginForm = document.getElementById('login-form');
+  var $loginPass = document.getElementById('login-pass');
+  var $loginErr  = document.getElementById('login-err');
+  var $btnLogin  = document.getElementById('btn-login');
+
+  function token() { return state.token; }
+
+  function authedFetch(url, opts) {
+    opts = opts || {};
+    opts.headers = Object.assign({}, opts.headers, { 'X-Admin-Token': token() });
+    return fetch(url, opts);
+  }
+
+  function showApp() {
+    $veil.classList.add('hidden');
+    try { sessionStorage.setItem('nob_admin_ok', '1'); } catch (e) { /* noop */ }
+  }
+
+  function rememberPass(pass) {
+    state.token = pass;
+    try { sessionStorage.setItem('nob_admin_tok', pass); } catch (e) { /* noop */ }
+  }
+
+  function tryLogin(pass, cb) {
+    $btnLogin.disabled = true;
+    $btnLogin.textContent = 'Controleren…';
+    fetch('/api/config', { cache: 'no-store', headers: { 'X-Admin-Token': pass } })
+      .then(function (r) { cb(r.status === 200); })
+      .catch(function () { cb(false); })
+      .then(function () {
+        $btnLogin.disabled = false;
+        $btnLogin.textContent = 'Inloggen';
+      });
+  }
+
+  $loginForm.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var pass = $loginPass.value;
+    if (!pass) { $loginErr.classList.add('show'); return; }
+
+    tryLogin(pass, function (ok) {
+      if (ok) {
+        rememberPass(pass);
+        $loginErr.classList.remove('show');
+        showApp();
+        loadIndex();
+        loadStats();
+      } else {
+        $loginErr.classList.add('show');
+        $loginPass.focus();
+        $loginPass.select();
+      }
+    });
+  });
+
+  /* Al ingelogd deze sessie? Toon dan meteen het paneel.
+     Let op: bij de eerste API-call gaat de opgeslagen token mee;
+     is de server herstart met een ander wachtwoord, dan volgt een 401. */
+  (function initLogin() {
+    var saved = '';
+    try { saved = sessionStorage.getItem('nob_admin_tok') || ''; } catch (e) { /* noop */ }
+
+    if (saved) {
+      tryLogin(saved, function (ok) {
+        if (ok) {
+          rememberPass(saved);
+          showApp();
+          loadIndex();
+          loadStats();
+        } else {
+          try { sessionStorage.removeItem('nob_admin_tok'); } catch (e) { /* noop */ }
+          $veil.classList.remove('hidden');
+          $loginPass.focus();
+        }
+      });
+    } else {
+      $veil.classList.remove('hidden');
+      setTimeout(function () { $loginPass.focus(); }, 50);
+    }
+  })();
 
   /* ------------------------------------------------------------------ *
    *  1. Kanaal normaliseren (gelijk aan index.html)
@@ -1031,8 +1187,9 @@
 
   function loadIndex() {
     // 1) Probeer de live API (werkt op de server, altijd actueel)
-    fetch('/api/config', { cache: 'no-store' })
+    authedFetch('/api/config', { cache: 'no-store' })
       .then(function (r) {
+        if (r.status === 401) { throw new Error('unauthorized'); }
         if (!r.ok) { throw new Error('HTTP ' + r.status); }
         return r.json();
       })
@@ -1139,15 +1296,26 @@
     $btnSave.disabled = true;
     $btnSave.textContent = 'Bezig met opslaan…';
 
-    fetch('/api/config', {
+    authedFetch('/api/config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(configPayload())
     })
       .then(function (r) {
+        if (r.status === 401) {
+          // sessie verlopen / wachtwoord gewijzigd -> opnieuw inloggen
+          state.token = '';
+          try { sessionStorage.removeItem('nob_admin_tok'); } catch (e) { /* noop */ }
+          $veil.classList.remove('hidden');
+          $loginPass.focus();
+          $btnSave.textContent = 'Opslaan (live)';
+          refreshButtons();
+          return null;
+        }
         return r.json().then(function (data) { return { status: r.status, data: data }; });
       })
       .then(function (res) {
+        if (!res) { return; }
         if (res.status === 200 && res.data && res.data.ok) {
           showStatus('info',
             '<b>Live opgeslagen.</b> De landingspagina gebruikt nu direct deze ' +
@@ -1212,7 +1380,7 @@
   }
 
   function loadStats() {
-    fetch('/api/stats?days=' + state.statsDays, { cache: 'no-store' })
+    authedFetch('/api/stats?days=' + state.statsDays, { cache: 'no-store' })
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (data) { renderStats(data); })
       .catch(function () { renderStats(null); });
@@ -1320,9 +1488,11 @@
     reader.readAsText(f, 'utf-8');
   });
 
-  loadIndex();
-  loadStats();
-  setInterval(loadStats, 30000); // elke 30 s verversen
+  /* loadIndex() en loadStats() worden na geslaagde login aangeroepen */
+  setInterval(function () {
+    if (state.token && !$veil.classList.contains('hidden')) { return; }
+    loadStats();
+  }, 30000); // elke 30 s verversen (alleen als ingelogd)
 })();
 </script>
 
