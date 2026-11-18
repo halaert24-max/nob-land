@@ -528,6 +528,115 @@ function isBot(req) {
   return BOT_RE.test(String(req.headers['user-agent'] || ''));
 }
 
+/* ================================================================== *
+ *  Geo: landcodes voor de admin-vlaggen
+ *  NL bepalen we lokaal (isNL); andere landen komen van ip-api.com
+ *  (batch, geen API-key) en worden in stats.json gecached.
+ * ================================================================== */
+function isPrivateIp(ip) {
+  if (!ip) { return true; }
+  if (ip.indexOf(':') > -1) {
+    return /^(::1$|f[cd][0-9a-f]{2}:|fe80:)/i.test(ip);
+  }
+  const m = ip.match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
+  if (!m) { return true; }
+  const a = Number(m[1]), b = Number(m[2]);
+  if (a === 0 || a === 10 || a === 127) { return true; }
+  if (a === 172 && b >= 16 && b <= 31) { return true; }
+  if (a === 192 && b === 168) { return true; }
+  if (a === 169 && b === 254) { return true; }
+  if (a === 100 && b >= 64 && b <= 127) { return true; }
+  return false;
+}
+
+const GEO_MAX = 8000;      // max. gecachte IP's in stats.json
+const GEO_BATCH = 100;     // ip-api.com batch-limiet
+
+let geoQueue = {};         // ip -> 1 (nog op te halen)
+let geoTimer = null;
+let geoBusy = false;
+
+function queueGeo(ip) {
+  if (!ip || isPrivateIp(ip)) { return; }
+  if (stats.geo[ip]) { return; }
+  if (geoQueue[ip]) { return; }
+  geoQueue[ip] = 1;
+  scheduleGeoLookup();
+}
+
+function scheduleGeoLookup() {
+  if (geoTimer || geoBusy) { return; }
+  geoTimer = setTimeout(function () {
+    geoTimer = null;
+    runGeoLookup();
+  }, 4000);
+  if (geoTimer.unref) { geoTimer.unref(); }
+}
+
+function runGeoLookup() {
+  if (geoBusy) { return; }
+  const ips = Object.keys(geoQueue).slice(0, GEO_BATCH);
+  if (!ips.length) { return; }
+  ips.forEach(function (ip) { delete geoQueue[ip]; });
+  if (Object.keys(geoQueue).length) { scheduleGeoLookup(); }
+
+  geoBusy = true;
+  const body = JSON.stringify(ips);
+  const req = http.request({
+    hostname: 'ip-api.com',
+    path: '/batch?fields=status,countryCode',
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Content-Length': Buffer.byteLength(body)
+    },
+    timeout: 8000
+  }, function (res) {
+    let data = '';
+    res.on('data', function (c) { data += c; });
+    res.on('end', function () {
+      geoBusy = false;
+      if (res.statusCode !== 200) { return; } // bijv. rate-limit: probeer later weer
+      try {
+        const arr = JSON.parse(data);
+        if (Array.isArray(arr)) {
+          arr.forEach(function (r, i) {
+            const cc = (r && r.status === 'success' && r.countryCode)
+              ? String(r.countryCode).toUpperCase() : '';
+            /* Leeg resultaat ook cachen: nooit eindeloos opnieuw proberen. */
+            stats.geo[ips[i]] = { cc: cc, ts: Date.now() };
+          });
+          pruneGeo();
+          saveStats();
+        }
+      } catch (e) { /* antwoord negeren, volgende refresh probeert opnieuw */ }
+      if (Object.keys(geoQueue).length) { scheduleGeoLookup(); }
+    });
+  });
+  req.on('timeout', function () { req.destroy(); });
+  req.on('error', function () {
+    geoBusy = false; // niet opnieuw plaatsen: /api/visits plaatst ze terug
+  });
+  req.end(body);
+}
+
+function pruneGeo() {
+  const keys = Object.keys(stats.geo);
+  if (keys.length <= GEO_MAX) { return; }
+  const sorted = keys
+    .map(function (ip) { return [ip, stats.geo[ip].ts || 0]; })
+    .sort(function (a, b) { return a[1] - b[1]; });
+  for (let i = 0; i < sorted.length - GEO_MAX; i++) {
+    delete stats.geo[sorted[i][0]];
+  }
+}
+
+function ccFor(ip, nl) {
+  if (nl) { return 'NL'; } // lokaal bepaald, geen lookup nodig
+  const g = stats.geo[ip];
+  return (g && g.cc) || '';
+}
+
 /* True = verzoek moet de whitepage zien. ?land=1 omzeilt de cloaker
    (handig voor tests en voor het delen van de echte pagina). */
 function wantsWhitepage(req) {
@@ -702,15 +811,19 @@ function applyConfig(html, cfg) {
 /* ================================================================== *
  *  Stats
  * ================================================================== */
-let stats = { days: {} };
+let stats = { days: {}, geo: {} };
 
 function loadStats() {
   try {
     const raw = fs.readFileSync(STATS_FILE, 'utf-8').replace(/^﻿/, '');
     const parsed = JSON.parse(raw);
-    if (parsed && typeof parsed === 'object' && parsed.days) { stats = parsed; }
+    if (parsed && typeof parsed === 'object' && parsed.days) {
+      stats = parsed;
+      if (!stats.geo || typeof stats.geo !== 'object') { stats.geo = {}; }
+      if (!Array.isArray(stats.log)) { stats.log = []; }
+    }
   } catch (e) {
-    stats = { days: {} };
+    stats = { days: {}, geo: {} };
   }
 }
 
@@ -775,19 +888,23 @@ function record(type, channelIdx, meta) {
 
   /* Detaillog voor de admin: laatste LOG_LIMIT bezoekers. */
   if (!Array.isArray(stats.log)) { stats.log = []; }
+  const metaIp = (meta && meta.ip) || '';
   stats.log.push({
     ts: Date.now(),
     type: type,
     t: channelIdx,
-    ip: (meta && meta.ip) || '',
+    ip: metaIp,
     ua: String((meta && meta.ua) || '').slice(0, 300),
     ref: String((meta && meta.ref) || '').slice(0, 300),
     bot: !!(meta && meta.bot),
-    nl: !!(meta && meta.nl)
+    nl: !!(meta && meta.nl),
+    cc: ccFor(metaIp, !!(meta && meta.nl))
   });
   if (stats.log.length > LOG_LIMIT) {
     stats.log = stats.log.slice(-LOG_LIMIT);
   }
+
+  if (metaIp) { queueGeo(metaIp); }
 
   saveStats();
 }
@@ -841,7 +958,8 @@ function visitReport(daysBack) {
     if (e.ip) {
       if (!byIp[e.ip]) {
         byIp[e.ip] = { ip: e.ip, visits: 0, clicks: 0, blocked: 0,
-                       last: 0, ua: '', t: e.t, bot: e.bot, nl: e.nl };
+                       last: 0, ua: '', t: e.t, bot: e.bot, nl: e.nl,
+                       cc: ccFor(e.ip, e.nl) || e.cc || '' };
         ipSeen[e.ip] = {};
       }
       const rec = byIp[e.ip];
@@ -854,8 +972,12 @@ function visitReport(daysBack) {
         rec.t = e.t;
         rec.bot = e.bot;
         rec.nl = e.nl;
+        rec.cc = ccFor(e.ip, e.nl) || rec.cc || '';
       }
       if (e.type === 'visit') { ipSeen[e.ip][idx] = 1; }
+
+      /* Onbekende landen alsnog opzoeken (bv. na herstart of rate-limit). */
+      if (!rec.cc) { queueGeo(e.ip); }
 
       /* Unieke personen per kanaal: een IP telt per soort één keer. */
       if (!chIpSeen[idx][e.ip]) {
@@ -885,9 +1007,23 @@ function visitReport(daysBack) {
     return rec;
   }).sort(function (a, b) { return b.last - a.last; });
 
+  /* Per land (voor de vlaggen/filters in de admin). */
+  const byCountry = {};
+  visitors.forEach(function (v) {
+    const cc = v.cc || '??';
+    if (!byCountry[cc]) { byCountry[cc] = { visits: 0, clicks: 0, blocked: 0, ips: 0 }; }
+    byCountry[cc].visits += v.visits;
+    byCountry[cc].clicks += v.clicks;
+    byCountry[cc].blocked += v.blocked;
+    byCountry[cc].ips += 1;
+  });
+
+  scheduleGeoLookup();
+
   return {
     total: { visits: totalVisits, clicks: totalClicks, blocked: totalBlocked },
     channels: byChannel,
+    countries: byCountry,
     visitors: visitors,
     log: log,
     /* Vanaf wanneer het detaillog loopt (oudere dagen staan alleen in de

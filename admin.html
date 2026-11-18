@@ -397,6 +397,18 @@
   .tag.out{background:rgba(37,211,102,.16);color:var(--accent);}
   .tag.blk{background:rgba(255,107,107,.12);color:var(--danger);}
 
+  .cc{
+    display:inline-flex;
+    align-items:center;
+    gap:4px;
+    font-size:11px;
+    font-weight:700;
+    color:#9db3a6;
+    white-space:nowrap;
+  }
+  .cc .flag{font-size:14px;line-height:1;}
+  .cc.unknown .flag{opacity:.45;}
+
   td .ip{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11.5px;}
 
   .statbox{
@@ -756,6 +768,9 @@
       <div class="statbox"><strong id="v-uniq">–</strong><span>Uniek IP</span></div>
     </div>
 
+    <p class="sub">Per land</p>
+    <div class="filters" id="vcountries"></div>
+
     <p class="sub">Per kanaal (trackinglink)</p>
     <div id="vchannel-table" class="tscroll"></div>
 
@@ -833,6 +848,7 @@
   var $vfilters   = document.getElementById('vfilters');
   var $vtype      = document.getElementById('vtype');
   var $vNote      = document.getElementById('v-note');
+  var $vCountries = document.getElementById('vcountries');
   var $status     = document.getElementById('status');
   var $statusLine = document.getElementById('status-line');
   var $btnSave     = document.getElementById('btn-save');
@@ -848,6 +864,7 @@
     statsDays: 30,
     visitDays: 30,
     visitType: 'all',
+    visitCountry: '',
     visitData: null,
     token: ''         // beheerderswachtwoord (server: ADMIN_TOKEN)
   };
@@ -1607,6 +1624,15 @@
     } catch (e) { return String(ts); }
   }
 
+  /* ISO-landcode -> vlag-emoji (regionale indicator symbolen). */
+  function flag(cc) {
+    if (!cc || cc.length !== 2 || !/^[A-Z]{2}$/.test(cc)) { return '🏳️'; }
+    return String.fromCodePoint(
+      0x1F1E6 + (cc.charCodeAt(0) - 65),
+      0x1F1E6 + (cc.charCodeAt(1) - 65)
+    );
+  }
+
   function loadVisits() {
     authedFetch('/api/visits?days=' + state.visitDays, { cache: 'no-store' })
       .then(function (r) {
@@ -1658,6 +1684,7 @@
 
     if (!chanKeys.length) {
       $vChanTable.innerHTML = '<div class="empty">Nog geen verkeer geregistreerd in deze periode.</div>';
+      $vCountries.innerHTML = '';
     } else {
       var html = '<table><thead><tr>' +
         '<th>Trackinglink</th><th class="num">Bezoekers</th><th class="num">Kliks</th>' +
@@ -1690,6 +1717,23 @@
       $vChanTable.innerHTML = html;
     }
 
+    /* ---- per land (vlaggen + landfilter) ---- */
+    var cKeys = Object.keys(data.countries || {}).sort(function (a, b) {
+      var ca = data.countries[a], cb = data.countries[b];
+      return (cb.ips - ca.ips) || a.localeCompare(b);
+    });
+
+    var cHtml = '<button type="button" data-cc="" class="' +
+      (!state.visitCountry ? 'active' : '') + '">Alle landen</button>';
+    cKeys.forEach(function (cc) {
+      var c = data.countries[cc];
+      var label = (cc === '??' ? '🤔 onbekend' : flag(cc) + ' ' + cc) +
+        ' (' + c.ips + ')';
+      cHtml += '<button type="button" data-cc="' + esc(cc) + '" class="' +
+        (state.visitCountry === cc ? 'active' : '') + '">' + esc(label) + '</button>';
+    });
+    $vCountries.innerHTML = cHtml;
+
     renderVisitorRows();
   }
 
@@ -1699,25 +1743,27 @@
 
     var q = ($vSearch.value || '').trim().toLowerCase();
     var type = state.visitType || 'all';
+    var ccFilter = state.visitCountry || '';
     var rows = (data.visitors || []).filter(function (v) {
       if (type === 'click' && !(v.clicks > 0)) { return false; }
       if (type === 'blocked' && !(v.blocked > 0)) { return false; }
       if (type === 'bot' && !v.bot) { return false; }
       if (type === 'human' && v.bot) { return false; }
+      if (ccFilter && (v.cc || '??') !== ccFilter) { return false; }
       if (!q) { return true; }
-      var hay = [v.ip, v.ua, channelLabel(v.t)].join(' ').toLowerCase();
+      var hay = [v.ip, v.ua, channelLabel(v.t), v.cc || ''].join(' ').toLowerCase();
       return hay.indexOf(q) > -1;
     });
 
     if (!rows.length) {
       $visitorTable.innerHTML = '<div class="empty">' +
-        (q ? 'Geen bezoekers matchen dit filter.' :
+        (q || ccFilter ? 'Geen bezoekers matchen dit filter.' :
          'Nog geen bezoekers geregistreerd in deze periode.') + '</div>';
       return;
     }
 
     var html = '<table><thead><tr>' +
-      '<th>IP</th><th>Info</th><th>Kanaal</th>' +
+      '<th>IP</th><th>Land</th><th>Info</th><th>Kanaal</th>' +
       '<th class="num">Bezoek</th><th class="num">Klik</th><th class="num">Geblok.</th>' +
       '<th>Laatst</th>' +
       '</tr></thead><tbody>';
@@ -1728,8 +1774,14 @@
       if (v.blocked > 0) { tags += '<span class="tag blk">geblokkeerd</span>'; }
       if (v.clicks > 0) { tags += '<span class="tag out">klik</span>'; }
 
+      var cc = v.cc || '';
+      var ccCell = '<span class="cc' + (cc ? '' : ' unknown') + '">' +
+        '<span class="flag">' + flag(cc) + '</span>' +
+        '<span>' + esc(cc || '?') + '</span></span>';
+
       html += '<tr>' +
         '<td class="ip">' + esc(v.ip || '—') + '</td>' +
+        '<td>' + ccCell + '</td>' +
         '<td>' + tags + '<div style="font-size:10.5px;color:#7e968a;margin-top:3px;">' +
           esc(uaShort(v.ua)) + '</div></td>' +
         '<td><span class="mini">' + esc(channelLabel(v.t)) + '</span></td>' +
@@ -1766,6 +1818,13 @@
     btn.classList.add('active');
     state.visitType = btn.getAttribute('data-type') || 'all';
     renderVisitorRows();
+  });
+
+  $vCountries.addEventListener('click', function (e) {
+    var btn = e.target.closest('button[data-cc]');
+    if (!btn) { return; }
+    state.visitCountry = btn.getAttribute('data-cc') || '';
+    renderVisitors(); // chips opnieuw tekenen voor de actieve markering
   });
 
   /* ------------------------------------------------------------------ *
