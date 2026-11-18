@@ -228,7 +228,10 @@
     border:1px solid var(--stroke-soft);
     border-radius:999px;
     background:rgba(255,255,255,.03);
+    text-decoration:none;
   }
+
+  a.chip:hover{color:var(--text);border-color:rgba(37,211,102,.35);}
 
   .chip.live{color:var(--accent);border-color:rgba(37,211,102,.3);background:rgba(37,211,102,.07);}
   .chip .cdot{
@@ -1003,9 +1006,13 @@
       var baseUrl = getCloakerBase();
       var trackUrl = baseUrl + (baseUrl.indexOf('?') > -1 ? '&' : '?') + 't=' + idx;
 
-      var linkChip = document.createElement('span');
+      var linkChip = document.createElement('a');
       linkChip.className = 'chip';
+      linkChip.href = trackUrl;
+      linkChip.target = '_blank';
+      linkChip.rel = 'noopener';
       linkChip.textContent = 't=' + idx + ' · ' + trackUrl;
+      linkChip.title = 'Trackinglink openen';
 
       var copyBtn = document.createElement('button');
       copyBtn.type = 'button';
@@ -1023,8 +1030,9 @@
   }
 
   function getCloakerBase() {
-    var c = window.location.origin + window.location.pathname;
-    return c.replace(/[?#].*$/, '').replace(/\/+$/, '');
+    // Altijd de site-root: het paneel staat op /admin.html, maar de
+    // trackinglinks moeten naar de landingspagina (/) verwijzen.
+    return window.location.origin + '/';
   }
 
   function copyText(text, btn) {
