@@ -626,11 +626,10 @@
 
   <!-- ---------------------------- FORM ---------------------------- -->
   <section class="card">
-    <h2 class="card__title">Pixel, cloaker &amp; kanalen</h2>
+    <h2 class="card__title">Pixel &amp; kanalen</h2>
     <p class="card__hint">
-      Vul je Meta Pixel ID, de cloaker-link die je in je advertenties gebruikt en
-      één of meer Telegram-kanalen in. Wijzigingen worden rechtstreeks in
-      <code>index.html</code> geschreven.
+      Vul je Meta Pixel ID en één of meer Telegram-kanalen in. Wijzigingen worden
+      rechtstreeks in <code>index.html</code> geschreven.
     </p>
 
     <div class="field">
@@ -638,13 +637,6 @@
       <input id="pixel" type="text" inputmode="numeric" autocomplete="off"
              spellcheck="false" placeholder="bijv. 1234567890123456">
       <p class="msg" id="pixel-msg"></p>
-    </div>
-
-    <div class="field">
-      <label for="cloaker">Cloaker-link (advertentie-URL)</label>
-      <input id="cloaker" type="text" autocomplete="off"
-             spellcheck="false" placeholder="https:// jouw-cloaker.nl/path">
-      <p class="msg" id="cloaker-msg"></p>
     </div>
 
     <div class="field">
@@ -718,9 +710,7 @@
    *  DOM
    * ------------------------------------------------------------------ */
   var $pixel      = document.getElementById('pixel');
-  var $cloaker    = document.getElementById('cloaker');
   var $pixelMsg   = document.getElementById('pixel-msg');
-  var $cloakerMsg = document.getElementById('cloaker-msg');
   var $channels   = document.getElementById('channels');
   var $channelMsg = document.getElementById('channel-msg');
   var $btnAdd     = document.getElementById('btn-add');
@@ -897,10 +887,12 @@
     return { ok: true, level: 'ok', text: 'Ziet er goed uit.' };
   }
 
+  /* (Cloaker-veld verwijderd; validateCloaker blijft voor compatibiliteit
+     met oudere opgeslagen configs die nog een cloaker-waarde bevatten.) */
   function validateCloaker(url) {
     var v = String(url || '').trim();
     if (!v) {
-      return { ok: true, level: 'ok', text: 'Geen cloaker ingesteld — advertenties gaan direct naar deze pagina.' };
+      return { ok: true, level: 'ok', text: '' };
     }
     if (!/^https?:\/\/[^\s]+\.[^\s]+/i.test(v)) {
       return { ok: false, level: 'err', text: 'Vul een geldige URL in (met https://).' };
@@ -1031,8 +1023,8 @@
   }
 
   function getCloakerBase() {
-    var c = $cloaker.value.trim() || window.location.origin + window.location.pathname;
-    return c.replace(/\/+$/, '');
+    var c = window.location.origin + window.location.pathname;
+    return c.replace(/[?#].*$/, '').replace(/\/+$/, '');
   }
 
   function copyText(text, btn) {
@@ -1093,25 +1085,21 @@
 
   function refreshButtons() {
     var pv = validatePixel($pixel.value);
-    var cv = validateCloaker($cloaker.value);
     var okC = state.rows.some(function (r) { return r.link.trim() && validRow(r.link).ok; }) &&
               state.rows.every(function (r) { return !r.link.trim() || validRow(r.link).ok; });
 
     // Live opslaan heeft state.html niet nodig; downloaden wel
-    $btnSave.disabled     = !(pv.ok && cv.ok && okC);
-    $btnDownload.disabled = !(pv.ok && cv.ok && okC && !!state.html);
+    $btnSave.disabled     = !(pv.ok && okC);
+    $btnDownload.disabled = !(pv.ok && okC && !!state.html);
   }
 
   function refresh() {
     var pv = validatePixel($pixel.value);
     setMsg($pixelMsg, pv.text, 'msg ' + pv.level);
 
-    var cv = validateCloaker($cloaker.value);
-    setMsg($cloakerMsg, cv.text, 'msg ' + cv.level);
-
     refreshMsgs();
     refreshButtons();
-    renderRows(); // hercalculeert de trackinglinks (cloaker kan gewijzigd zijn)
+    renderRows(); // hercalculeert de trackinglinks
   }
 
   /* ------------------------------------------------------------------ *
@@ -1164,7 +1152,6 @@
 
   function acceptConfig(cfg, sourceLabel) {
     $pixel.value   = cfg.pixelId === 'YOUR_PIXEL_ID' ? '' : (cfg.pixelId || '');
-    $cloaker.value = cfg.cloaker || '';
 
     state.rows = [];
     var list = (cfg.channels && cfg.channels.length)
@@ -1224,7 +1211,6 @@
    * ------------------------------------------------------------------ */
   function buildOutput() {
     var pixelId = $pixel.value.trim();
-    var cloaker = $cloaker.value.trim();
     var now = Date.now();
 
     var entries = state.rows
@@ -1241,7 +1227,7 @@
       '/* <<<CONFIG_START>>> */\n' +
       'window.SITE_CONFIG = {\n' +
       '  pixelId: ' + JSON.stringify(pixelId) + ',\n' +
-      '  cloaker: ' + JSON.stringify(cloaker) + ',\n' +
+      '  cloaker: "",\n' +
       '  channels: [\n' + entries.join(',\n') + '\n  ]\n' +
       '};\n' +
       '/* <<<CONFIG_END>>> */';
@@ -1278,7 +1264,7 @@
   function configPayload() {
     return {
       pixelId: $pixel.value.trim(),
-      cloaker: $cloaker.value.trim(),
+      cloaker: '',
       channels: state.rows
         .filter(function (r) { return r.link.trim() && validRow(r.link).ok; })
         .map(function (r) {
@@ -1450,14 +1436,6 @@
     var pv = validatePixel($pixel.value);
     setMsg($pixelMsg, pv.text, 'msg ' + pv.level);
     $pixel.classList.toggle('is-error', !pv.ok && $pixel.value.trim() !== '');
-    refreshButtons();
-  });
-
-  $cloaker.addEventListener('input', function () {
-    var cv = validateCloaker($cloaker.value);
-    setMsg($cloakerMsg, cv.text, 'msg ' + cv.level);
-    $cloaker.classList.toggle('is-error', !cv.ok && $cloaker.value.trim() !== '');
-    updateAllRowMeta();
     refreshButtons();
   });
 
