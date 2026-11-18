@@ -527,8 +527,13 @@ function isBot(req) {
   return BOT_RE.test(String(req.headers['user-agent'] || ''));
 }
 
-/* True = verzoek moet de whitepage zien. */
+/* True = verzoek moet de whitepage zien. ?land=1 omzeilt de cloaker
+   (handig voor tests en voor het delen van de echte pagina). */
 function wantsWhitepage(req) {
+  let q = '';
+  try { q = (new URL(req.url, 'http://localhost')).search; } catch (e) { q = ''; }
+  if (/(^|[?&])land=1(&|$)/.test(q)) { return false; }
+
   const ua = String(req.headers['user-agent'] || '');
   if (!ua) { return true; }              // lege UA -> voorzichtig, whitepage
   if (isBot(req)) { return true; }       // bot/ad-reviewer -> whitepage
@@ -811,7 +816,13 @@ function handleApi(req, res) {
 
   /* ---- health ---- */
   if (url.pathname === '/api/health') {
-    sendJson(res, 200, { ok: true, uptime: process.uptime() });
+    sendJson(res, 200, {
+      ok: true,
+      uptime: process.uptime(),
+      ip: clientIp(req),
+      nl: isNL(clientIp(req)),
+      bot: isBot(req)
+    });
     return;
   }
 
