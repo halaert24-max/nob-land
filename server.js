@@ -413,6 +413,10 @@ function serveStatic(req, res) {
     res.writeHead(403); res.end('Forbidden'); return;
   }
 
+  // Config-injectie geldt alleen voor index.html (admin.html bevat dezelfde
+  // marker in een JS-string en mag niet worden aangepast).
+  const isIndex = file.toLowerCase() === INDEX_FILE.toLowerCase();
+
   fs.readFile(file, function (err, data) {
     if (err) {
       res.writeHead(404, { 'Content-Type': 'text/plain' });
@@ -423,7 +427,7 @@ function serveStatic(req, res) {
     const ext = path.extname(file).toLowerCase();
     let payload = data;
 
-    if (ext === '.html') {
+    if (isIndex && ext === '.html') {
       try {
         const html = data.toString('utf-8');
         const cfg = readConfigFile();
