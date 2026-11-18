@@ -1,0 +1,13 @@
+{
+  "name": "nob-landing",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Telegram pre-lander + admin panel + stats API",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
