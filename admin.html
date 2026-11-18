@@ -615,11 +615,13 @@
   <section class="card">
     <h2 class="card__title">Opslaan</h2>
     <p class="card__hint" id="save-hint">
-      Controleer de waarden en sla op. Daarna upload je <code>index.html</code> naar je server.
+      <b>Opslaan (live)</b> schrijft de instellingen direct naar de server — de
+      landingspagina is meteen bijgewerkt, geen upload nodig.
+      <b>Download</b> bewaart een kopie van <code>index.html</code>.
     </p>
 
     <div class="actions">
-      <button id="btn-save" class="primary" type="button" disabled>Opslaan in index.html</button>
+      <button id="btn-save" class="primary" type="button" disabled>Opslaan (live)</button>
       <button id="btn-download" class="ghost" type="button" disabled>Download index.html</button>
     </div>
 
@@ -939,8 +941,9 @@
     var okC = state.rows.some(function (r) { return r.link.trim() && validRow(r.link).ok; }) &&
               state.rows.every(function (r) { return !r.link.trim() || validRow(r.link).ok; });
 
-    $btnSave.disabled     = !(pv.ok && cv.ok && okC && !!state.html);
-    $btnDownload.disabled = !(pv.ok && cv.ok && okC);
+    // Live opslaan heeft state.html niet nodig; downloaden wel
+    $btnSave.disabled     = !(pv.ok && cv.ok && okC);
+    $btnDownload.disabled = !(pv.ok && cv.ok && okC && !!state.html);
   }
 
   function refresh() {
@@ -1000,30 +1003,62 @@
     if (sourceName) { state.fileName = sourceName; }
 
     var cfg = readConfig(html) || { pixelId: '', cloaker: '', channels: [] };
-    $pixel.value   = cfg.pixelId === 'YOUR_PIXEL_ID' ? '' : cfg.pixelId;
+    acceptConfig(cfg, 'index.html geladen (offline modus) — opslaan downloadt het bestand');
+  }
+
+  function acceptConfig(cfg, sourceLabel) {
+    $pixel.value   = cfg.pixelId === 'YOUR_PIXEL_ID' ? '' : (cfg.pixelId || '');
     $cloaker.value = cfg.cloaker || '';
 
     state.rows = [];
-    (cfg.channels.length ? cfg.channels : [{ link: '', addedAt: 0 }]).forEach(function (c) {
-      state.rows.push({ id: ++rowSeq, link: placeholderCheck(c.link), addedAt: c.addedAt || 0 });
+    var list = (cfg.channels && cfg.channels.length)
+      ? cfg.channels
+      : [{ link: '', addedAt: 0 }];
+
+    list.forEach(function (c) {
+      state.rows.push({
+        id: ++rowSeq,
+        link: placeholderCheck(normalizeChannel(c.link).value || c.link),
+        addedAt: c.addedAt || 0
+      });
     });
     renderRows();
 
-    $statusLine.textContent = 'index.html geladen — pas de waarden aan';
+    $statusLine.textContent = sourceLabel || 'index.html geladen — pas de waarden aan';
     $filebox.classList.remove('show');
     refresh();
   }
 
   function loadIndex() {
-    fetch('index.html?ts=' + Date.now(), { cache: 'no-store' })
+    // 1) Probeer de live API (werkt op de server, altijd actueel)
+    fetch('/api/config', { cache: 'no-store' })
       .then(function (r) {
         if (!r.ok) { throw new Error('HTTP ' + r.status); }
-        return r.text();
+        return r.json();
       })
-      .then(function (html) { acceptHtml(html); })
+      .then(function (cfg) {
+        acceptConfig(cfg, 'Live instellingen geladen — wijzigingen gaan direct naar de site');
+      })
       .catch(function () {
-        $statusLine.textContent = 'Kon index.html niet automatisch laden';
-        $filebox.classList.add('show');
+        // 2) Terugvallen op index.html lezen (statische hosting / file://)
+        fetch('index.html?ts=' + Date.now(), { cache: 'no-store' })
+          .then(function (r) {
+            if (!r.ok) { throw new Error('HTTP ' + r.status); }
+            return r.text();
+          })
+          .then(function (html) {
+            if (!/<<<CONFIG_START>>>/.test(html)) {
+              showStatus('bad', 'index.html bevat geen instellingenblok.');
+              return;
+            }
+            state.html = html;
+            var cfg = readConfig(html) || { pixelId: '', cloaker: '', channels: [] };
+            acceptConfig(cfg, 'index.html geladen (offline modus) — opslaan downloadt het bestand');
+          })
+          .catch(function () {
+            $statusLine.textContent = 'Kon instellingen niet laden';
+            $filebox.classList.add('show');
+          });
       });
   }
 
@@ -1076,34 +1111,79 @@
   }
 
   /* ------------------------------------------------------------------ *
-   *  6. Opslaan
+   *  6. Opslaan  —  schrijft naar de live server (/api/config)
    * ------------------------------------------------------------------ */
   function showStatus(kind, html) {
     $status.className = 'status show ' + kind;
     $status.innerHTML = html;
   }
 
-  function saveDirect() {
-    if (!window.showSaveFilePicker) { download(); return; }
+  function configPayload() {
+    return {
+      pixelId: $pixel.value.trim(),
+      cloaker: $cloaker.value.trim(),
+      channels: state.rows
+        .filter(function (r) { return r.link.trim() && validRow(r.link).ok; })
+        .map(function (r) {
+          return {
+            link: normalizeChannel(r.link).value,
+            addedAt: r.addedAt || Date.now()
+          };
+        })
+    };
+  }
 
-    var content = buildOutput();
+  function saveLive() {
+    if (!window.fetch) { download(); return; }
 
-    window.showSaveFilePicker({
-      suggestedName: state.fileName,
-      types: [{ description: 'HTML', accept: { 'text/html': ['.html'] } }]
-    }).then(function (handle) {
-      return handle.createWritable().then(function (w) {
-        return w.write(content).then(function () { return w.close(); });
+    $btnSave.disabled = true;
+    $btnSave.textContent = 'Bezig met opslaan…';
+
+    fetch('/api/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(configPayload())
+    })
+      .then(function (r) {
+        return r.json().then(function (data) { return { status: r.status, data: data }; });
+      })
+      .then(function (res) {
+        if (res.status === 200 && res.data && res.data.ok) {
+          showStatus('info',
+            '<b>Live opgeslagen.</b> De landingspagina gebruikt nu direct deze ' +
+            'instellingen — geen upload nodig. ' +
+            '<a href="index.html" target="_blank" rel="noopener" ' +
+            'style="color:#25d366;font-weight:700;">Bekijk de pagina &rarr;</a>');
+
+          // addedAt bijwerken zodat de "actief sinds"-chips kloppen
+          if (res.data.config && res.data.config.channels) {
+            state.rows.forEach(function (row) {
+              var norm = normalizeChannel(row.link).value;
+              var match = res.data.config.channels.filter(function (c) {
+                return c.link === norm;
+              })[0];
+              if (match) { row.addedAt = match.addedAt; }
+            });
+            renderRows();
+          }
+        } else {
+          var msg = (res.data && res.data.errors)
+            ? res.data.errors.join(' ')
+            : 'Onbekende fout.';
+          showStatus('bad', '<b>Niet opgeslagen.</b> ' + esc(msg));
+        }
+      })
+      .catch(function () {
+        // Geen API (statische hosting) -> terugvallen op download
+        download();
+        showStatus('info',
+          '<b>Geen live API gevonden.</b> Bestand gedownload — ' +
+          'upload <code>' + state.fileName + '</code> naar je server.');
+      })
+      .then(function () {
+        $btnSave.textContent = 'Opslaan (live)';
+        refreshButtons();
       });
-    }).then(function () {
-      showStatus('info',
-        '<b>Opgeslagen.</b> Upload <code>' + state.fileName + '</code> nu naar je server ' +
-        '(overschrijf het oude bestand).');
-    }).catch(function (err) {
-      if (err && err.name === 'AbortError') { return; }
-      showStatus('bad', 'Opslaan mislukt: ' + (err && err.message ? err.message : 'onbekende fout') +
-                         '. Gebruik anders "Download index.html".');
-    });
   }
 
   function download() {
@@ -1225,7 +1305,7 @@
     if (inputs.length) { inputs[inputs.length - 1].focus(); }
   });
 
-  $btnSave.addEventListener('click', saveDirect);
+  $btnSave.addEventListener('click', saveLive);
   $btnDownload.addEventListener('click', download);
 
   $fileInput.addEventListener('change', function () {
